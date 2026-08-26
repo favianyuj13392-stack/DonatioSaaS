@@ -1,0 +1,105 @@
+services:
+  donatio_api:
+    build: ./backend
+    container_name: donatio_api
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+      - "8443:443"
+      - "8443:443/udp"
+    environment:
+      - SERVER_NAME=:80
+      - APP_ENV=local
+      - APP_DEBUG=true
+      - APP_KEY=base64:7B5lH6qK0u9V8Y+0x1Z2a3b4c5d6e7f8g9h0i1j2k3l=
+      - DB_CONNECTION=pgsql
+      - DB_HOST=donatio_postgres
+      - DB_PORT=5432
+      - DB_DATABASE=donatio_saas
+      - DB_USERNAME=donatio_user
+      - DB_PASSWORD=secret_donatio_pass
+      - REDIS_HOST=donatio_redis
+      - REDIS_PORT=6379
+      - QUEUE_CONNECTION=redis
+      - SESSION_DRIVER=redis
+      - CACHE_STORE=redis
+      - CACHE_DRIVER=redis
+      - CLOUDINARY_CLOUD_NAME=dgbgzj0t8
+      - CLOUDINARY_API_KEY=416823895637551
+      - CLOUDINARY_API_SECRET=UNAaguJXL8pXDIr32iQbUVCSup8
+      - CLOUDINARY_URL=cloudinary://416823895637551:UNAaguJXL8pXDIr32iQbUVCSup8@dgbgzj0t8
+    volumes:
+      - ./backend:/app
+      - ./backend/php.ini:/usr/local/etc/php/conf.d/custom.ini
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - donatio_net
+    depends_on:
+      - donatio_postgres
+      - donatio_redis
+
+  donatio_postgres:
+    image: postgres:16-alpine
+    container_name: donatio_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: donatio_saas
+      POSTGRES_USER: donatio_user
+      POSTGRES_PASSWORD: secret_donatio_pass
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - donatio_net
+
+  donatio_redis:
+    image: redis:7-alpine
+    container_name: donatio_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    networks:
+      - donatio_net
+
+  donatio_worker:
+    build: ./backend
+    container_name: donatio_worker
+    restart: unless-stopped
+    command: php /app/artisan queue:work --tries=3 --timeout=90
+    environment:
+      - APP_ENV=local
+      - APP_KEY=base64:7B5lH6qK0u9V8Y+0x1Z2a3b4c5d6e7f8g9h0i1j2k3l=
+      - DB_CONNECTION=pgsql
+      - DB_HOST=donatio_postgres
+      - DB_PORT=5432
+      - DB_DATABASE=donatio_saas
+      - DB_USERNAME=donatio_user
+      - DB_PASSWORD=secret_donatio_pass
+      - REDIS_HOST=donatio_redis
+      - REDIS_PORT=6379
+      - QUEUE_CONNECTION=redis
+      - CLOUDINARY_CLOUD_NAME=dgbgzj0t8
+      - CLOUDINARY_API_KEY=416823895637551
+      - CLOUDINARY_API_SECRET=UNAaguJXL8pXDIr32iQbUVCSup8
+      - CLOUDINARY_URL=cloudinary://416823895637551:UNAaguJXL8pXDIr32iQbUVCSup8@dgbgzj0t8
+    volumes:
+      - ./backend:/app
+    networks:
+      - donatio_net
+    depends_on:
+      - donatio_postgres
+      - donatio_redis
+
+networks:
+  donatio_net:
+    driver: bridge
+
+volumes:
+  pgdata:
+  redisdata:
+  caddy_data:
+  caddy_config:
