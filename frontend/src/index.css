@@ -1,0 +1,63 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --tenant-primary: #059669;
+  --tenant-primary-hover: #047857;
+  --tenant-primary-soft: rgba(5, 150, 105, 0.10);
+  --tenant-primary-subtle: rgba(5, 150, 105, 0.05);
+  --tenant-primary-border: rgba(5, 150, 105, 0.25);
+  --tenant-on-primary: #ffffff;
+
+  --tenant-secondary: #064e3b;
+  --tenant-secondary-soft: rgba(6, 78, 59, 0.08);
+  --tenant-on-secondary: #ffffff;
+
+  --tenant-surface: #ffffff;
+  --tenant-surface-alt: #f8fafc;
+  --tenant-border: #e2e8f0;
+
+  /* Aliases para retrocompatibilidad */
+  --tenant-hover: var(--tenant-primary-hover);
+  --tenant-light: var(--tenant-primary-soft);
+}
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  color: #1e293b;
+  background-color: var(--tenant-surface);
+}
+
+/* Clases de utilidad para el Design System */
+.btn-tenant-primary {
+  background-color: var(--tenant-primary);
+  color: var(--tenant-on-primary);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn-tenant-primary:hover {
+  background-color: var(--tenant-primary-hover);
+}
+
+.btn-tenant-primary:focus-visible {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 2px var(--tenant-surface), 0 0 0 4px var(--tenant-primary);
+}
+
+.badge-tenant {
+  background-color: var(--tenant-primary-soft);
+  color: var(--tenant-primary);
+  border: 1px solid var(--tenant-primary-border);
+}
+
+.progress-bar-tenant {
+  background-color: var(--tenant-primary);
+  transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Animaciones suaves para micro-interacciones */
+.transition-all-custom {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
