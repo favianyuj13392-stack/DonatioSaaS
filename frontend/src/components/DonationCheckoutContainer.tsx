@@ -72,9 +72,12 @@ export const DonationCheckoutContainer: React.FC = () => {
   // Tarjeta con AVS
   const [cardData, setCardData] = useState<CardFormData>({
     cardNumber: '',
+    expirationMonth: '12',
+    expirationYear: '2028',
     expiration: '',
     cvv: '',
     cardholderName: '',
+    email: '',
     isInternational: false,
     department: 'L',
     stateProvince: 'FL',

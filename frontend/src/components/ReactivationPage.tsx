@@ -18,9 +18,12 @@ export const ReactivationPage: React.FC<ReactivationPageProps> = ({ token }) => 
 
   const [cardData, setCardData] = useState<CardFormData>({
     cardNumber: '',
+    expirationMonth: '12',
+    expirationYear: '2028',
     expiration: '',
     cvv: '',
     cardholderName: '',
+    email: '',
     isInternational: false,
     department: 'L',
     stateProvince: 'FL',

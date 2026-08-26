@@ -22,47 +22,54 @@ import {
   AlertCircle,
   Loader2,
   RefreshCw,
-  Sparkles,
-  User,
-  Mail,
-  ArrowRight,
-  ArrowLeft,
+  Building2,
+  Coins,
 } from 'lucide-react';
 
 export const DonationWidget: React.FC = () => {
   const { tenant, campaign, subdomain, refreshData } = useTenant();
 
-  // Paso actual del widget (1: Decidir, 2: Datos, 3: Pago)
-  const [step, setStep] = useState<1 | 2 | 3>(1);
-
   const defaultFoundationTiers: DonationTier[] = [
-    { amount: 20, label: 'Aporte solidario inicial', is_default: false },
-    { amount: 50, label: 'Aporte de apoyo continuo', is_default: true },
-    { amount: 100, label: 'Aporte de alto impacto comunitario', is_default: false },
-    { amount: 200, label: 'Aporte de transformación sostenible', is_default: false },
+    { amount: 50, label: 'Aporte de apoyo continuo', is_default: false },
+    { amount: 100, label: 'Aporte de alto impacto', is_default: true },
+    { amount: 200, label: 'Aporte padrino solidario', is_default: false },
   ];
 
   const tiers: DonationTier[] = campaign?.donation_tiers && campaign.donation_tiers.length > 0
     ? campaign.donation_tiers
     : defaultFoundationTiers;
 
-  // Frecuencia inicial
-  const initialFrequency = campaign?.allowed_frequencies === 'monthly_only' ? 'monthly' : 'single';
+  // Frecuencia: monthly | single
+  const initialFrequency = campaign?.allowed_frequencies === 'monthly_only' ? 'monthly' : 'monthly';
   const [frequency, setFrequency] = useState<'single' | 'monthly'>(initialFrequency);
 
   // Método de pago: card | qr
   const [paymentMethod, setPaymentMethod] = useState<'card' | 'qr'>('card');
 
-  // Montos
+  // Montos y Moneda
   const defaultTier = tiers.find(t => t.is_default) || tiers[1] || tiers[0];
-  const [amount, setAmount] = useState<number>(defaultTier?.amount || 50);
+  const [amount, setAmount] = useState<number>(defaultTier?.amount || 100);
   const [customAmount, setCustomAmount] = useState<string>('');
   const [isCustom, setIsCustom] = useState<boolean>(false);
+  const [currency, setCurrency] = useState<'Bs' | 'USD'>('Bs');
 
-  // Datos del donante
-  const [donorName, setDonorName] = useState<string>('');
-  const [donorEmail, setDonorEmail] = useState<string>('');
-  const [isAnonymous, setIsAnonymous] = useState<boolean>(false);
+  // Datos de tarjeta con AVS nacional/internacional
+  const [cardData, setCardData] = useState<CardFormData>({
+    cardNumber: '',
+    expirationMonth: '12',
+    expirationYear: '2028',
+    expiration: '',
+    cvv: '',
+    cardholderName: '',
+    email: '',
+    isInternational: false,
+    department: 'L',
+    stateProvince: 'FL',
+    country: 'BO',
+    locality: 'La Paz',
+    address1: '',
+    postalCode: '',
+  });
 
   // ThreatMetrix Fingerprint Session ID
   const [fingerprintSessionId, setFingerprintSessionId] = useState<string>('');
@@ -73,28 +80,12 @@ export const DonationWidget: React.FC = () => {
   const [pendingAuthTxId, setPendingAuthTxId] = useState<string | null>(null);
   const [pendingRefNumber, setPendingRefNumber] = useState<string | null>(null);
 
-  // Tarjeta bancaria con AVS
-  const [cardData, setCardData] = useState<CardFormData>({
-    cardNumber: '',
-    expiration: '',
-    cvv: '',
-    cardholderName: '',
-    isInternational: false,
-    department: 'L',
-    stateProvince: 'FL',
-    country: 'BO',
-    locality: 'La Paz',
-    address1: 'Av. Principal 123',
-    postalCode: '0000',
-  });
-
-  // Estados de proceso
+  // Estados de proceso y modales
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [submittingStep, setSubmittingStep] = useState<string>('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [qrModalData, setQrModalData] = useState<QrResponse | null>(null);
 
-  // Modal de Éxito
   const [successModalData, setSuccessModalData] = useState<{
     amount: number;
     frequency: 'single' | 'monthly';
@@ -102,23 +93,24 @@ export const DonationWidget: React.FC = () => {
     receiptUrl: string | null;
   } | null>(null);
 
-  // Sincronizar frecuencia si la campaña cambia
+  // Sincronizar frecuencia si la campaña impone restricciones
   useEffect(() => {
     if (campaign?.allowed_frequencies === 'monthly_only') {
       setFrequency('monthly');
       setPaymentMethod('card');
+    } else if (campaign?.allowed_frequencies === 'single_only') {
+      setFrequency('single');
     }
   }, [campaign?.allowed_frequencies]);
 
+  // Si selecciona QR, forzar a donación única
   useEffect(() => {
-    if (frequency === 'monthly' && paymentMethod === 'qr') {
-      setPaymentMethod('card');
+    if (paymentMethod === 'qr') {
+      setFrequency('single');
     }
-  }, [frequency, paymentMethod]);
+  }, [paymentMethod]);
 
   const currentAmount = isCustom ? parseFloat(customAmount) || 0 : amount;
-  const currentTier = tiers.find(t => t.amount === currentAmount);
-  const impactLabel = currentTier?.label || (isCustom ? 'Aporte solidario para medicamentos y albergue' : 'Cubre insumos y atención médica');
 
   const handleSelectTier = (tierAmount: number) => {
     setIsCustom(false);
@@ -132,60 +124,73 @@ export const DonationWidget: React.FC = () => {
     setIsCustom(true);
   };
 
-  // Validar Paso 1 y avanzar a Paso 2
-  const handleProceedToStep2 = () => {
-    setErrorMessage(null);
+  // Validaciones del formulario
+  const validateForm = (): boolean => {
     if (currentAmount <= 0) {
-      setErrorMessage('Por favor selecciona o ingresa un monto válido para continuar.');
-      return;
+      setErrorMessage('Por favor selecciona o ingresa un monto válido.');
+      return false;
     }
-    setStep(2);
-  };
 
-  // Validar Paso 2 y avanzar a Paso 3 (o disparar QR)
-  const handleProceedToStep3 = (e: React.FormEvent) => {
-    e.preventDefault();
+    if (paymentMethod === 'card') {
+      const cleanCard = cardData.cardNumber.replace(/\s+/g, '');
+      if (!cardData.cardholderName.trim()) {
+        setErrorMessage('Por favor ingresa el nombre completo del titular de la tarjeta.');
+        return false;
+      }
+      if (!cardData.email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cardData.email)) {
+        setErrorMessage('Por favor ingresa un correo electrónico válido requerido por el banco.');
+        return false;
+      }
+      if (cleanCard.length < 13 || cleanCard.length > 19) {
+        setErrorMessage('Por favor ingresa un número de tarjeta válido (13 a 19 dígitos).');
+        return false;
+      }
+      if (!cardData.expirationMonth || !cardData.expirationYear) {
+        setErrorMessage('Por favor selecciona el mes y año de vencimiento de tu tarjeta.');
+        return false;
+      }
+      if (!cardData.cvv || cardData.cvv.length < 3) {
+        setErrorMessage('Por favor ingresa el código de seguridad CVV/CVC de 3 o 4 dígitos.');
+        return false;
+      }
+    }
+
     setErrorMessage(null);
-
-    if (!isAnonymous && !donorEmail) {
-      setErrorMessage('Por favor ingresa tu correo electrónico para enviarte el comprobante.');
-      return;
-    }
-
-    if (paymentMethod === 'qr') {
-      handleProcessDonation();
-    } else {
-      setStep(3);
-    }
+    return true;
   };
 
-  // Finalizar Cobro
+  // Ejecución final del cobro con tarjeta
   const executeFinalCheckout = async (refNumber: string, auth3ds?: any) => {
-    console.log('[DonationWidget] executeFinalCheckout starting with ref:', refNumber);
     if (!tenant) return;
 
     setSubmittingStep('Procesando donación segura...');
-    const [expMonth, expYear] = cardData.expiration.split('/');
     const cleanCard = cardData.cardNumber.replace(/\s+/g, '');
+
+    const nameParts = cardData.cardholderName.trim().split(' ');
+    const firstName = nameParts[0] || 'Donante';
+    const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : 'Solidario';
 
     const checkoutPayload = {
       foundation_id: tenant.id,
       campaign_id: campaign?.id || null,
       amount: currentAmount,
-      currency: 'BOB',
+      currency: currency === 'Bs' ? 'BOB' : 'USD',
       frequency,
-      donor_name: isAnonymous ? 'Donante Anónimo' : (donorName || cardData.cardholderName || 'Donante'),
-      donor_email: isAnonymous ? 'anonimo@donatio.lat' : donorEmail,
-      is_anonymous: isAnonymous,
+      donor_name: cardData.cardholderName.trim(),
+      first_name: firstName,
+      last_name: lastName,
+      donor_email: cardData.email.trim(),
+      email: cardData.email.trim(),
+      is_anonymous: false,
       merchant_reference_number: refNumber,
       card_number: cleanCard,
-      expiration_month: expMonth,
-      expiration_year: `20${expYear}`,
+      expiration_month: cardData.expirationMonth,
+      expiration_year: cardData.expirationYear,
       cvv: cardData.cvv,
       country: cardData.isInternational ? (cardData.country || 'US') : 'BO',
-      state: cardData.isInternational ? (cardData.stateProvince || 'FL') : cardData.department,
+      state: cardData.isInternational ? (cardData.stateProvince || 'FL') : (cardData.department || 'L'),
       locality: cardData.isInternational ? (cardData.locality || 'Miami') : 'La Paz',
-      address1: cardData.isInternational ? (cardData.address1 || '100 Biscayne Blvd') : 'Av. Principal 123',
+      address1: cardData.address1.trim() || (cardData.isInternational ? '100 Biscayne Blvd' : 'Av. Principal 123'),
       postal_code: cardData.isInternational ? (cardData.postalCode || '33101') : '0000',
       fingerprint_session_id: fingerprintSessionId,
       card_type: cleanCard.startsWith('4') ? 'VISA' : (cleanCard.startsWith('5') ? 'MASTERCARD' : 'AMEX'),
@@ -196,9 +201,7 @@ export const DonationWidget: React.FC = () => {
       accepted_terms: true,
     };
 
-    console.log('[DonationWidget] Submitting checkout payload...');
     const checkoutResult = await submitCheckout(subdomain, checkoutPayload);
-    console.log('[DonationWidget] Checkout result received:', checkoutResult);
 
     setSuccessModalData({
       amount: currentAmount,
@@ -206,12 +209,11 @@ export const DonationWidget: React.FC = () => {
       referenceNumber: checkoutResult.merchant_reference_number || refNumber,
       receiptUrl: checkoutResult.receipt_url || null,
     });
-    console.log('[DonationWidget] successModalData successfully set!');
 
     refreshData();
   };
 
-  // Manejador del Desafío Step-Up Resuelto
+  // Manejador del Desafío Step-Up Resuelto en el modal
   const handleChallengeSuccess = async () => {
     if (!pendingRefNumber || !tenant) return;
 
@@ -235,47 +237,36 @@ export const DonationWidget: React.FC = () => {
     }
   };
 
-  // Procesar Donación (Paso 3)
+  // Procesar Donación (Paso principal)
   const handleProcessDonation = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    setErrorMessage(null);
+    if (!validateForm() || !tenant) return;
 
     setIsSubmitting(true);
 
     try {
-      if (!tenant) return;
-
       if (paymentMethod === 'qr') {
         setSubmittingStep('Generando código QR dinámico...');
         const qrRes = await generateQrDonation(subdomain, {
           foundation_id: tenant.id,
           campaign_id: campaign?.id || null,
           amount: currentAmount,
-          donor_name: isAnonymous ? 'Donante Anónimo' : donorName,
-          donor_email: isAnonymous ? 'anonimo@donatio.lat' : donorEmail,
-          is_anonymous: isAnonymous,
+          donor_name: cardData.cardholderName.trim() || 'Donante Solidario',
+          donor_email: cardData.email.trim() || 'donante@donatio.lat',
+          is_anonymous: false,
         });
 
         setQrModalData(qrRes);
       } else {
         const cleanCard = cardData.cardNumber.replace(/\s+/g, '');
-        const [expMonth, expYear] = cardData.expiration.split('/');
 
-        if (cleanCard.length < 15 || !expMonth || !expYear || !cardData.cvv) {
-          setErrorMessage('Por favor completa todos los datos de tu tarjeta.');
-          setIsSubmitting(false);
-          return;
-        }
-
-        // 1. Setup 3DS2
-        setSubmittingStep('Iniciando sesión bancaria segura...');
-        console.log('[DonationWidget] Calling setup3dsSession...');
+        // 1. Setup 3DS2 Session
+        setSubmittingStep('Iniciando sesión segura con Cybersource (3DS2)...');
         const setupRes = await setup3dsSession(subdomain, {
           card_number: cleanCard,
-          expiration_month: expMonth,
-          expiration_year: `20${expYear}`,
+          expiration_month: cardData.expirationMonth,
+          expiration_year: cardData.expirationYear,
         });
-        console.log('[DonationWidget] setup3dsSession response:', setupRes);
 
         const refNo = setupRes.merchant_reference_number;
         const authInfo = setupRes.data;
@@ -285,39 +276,39 @@ export const DonationWidget: React.FC = () => {
           setCardinalJwt(authInfo.accessToken);
         }
 
-        // 2. Check Enrollment
-        setSubmittingStep('Verificando autenticación con el banco...');
-        console.log('[DonationWidget] Calling check3dsEnrollment with ref:', refNo);
+        const nameParts = cardData.cardholderName.trim().split(' ');
+        const firstName = nameParts[0] || 'Donante';
+        const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : 'Solidario';
+
+        // 2. Check Enrollment 3DS2
+        setSubmittingStep('Evaluando riesgo bancario (Check Enrollment)...');
         const enrollRes = await check3dsEnrollment(subdomain, {
           reference_id: authInfo?.referenceId,
           merchant_reference_number: refNo,
           amount: currentAmount,
-          currency: 'BOB',
+          currency: currency === 'Bs' ? 'BOB' : 'USD',
           card_number: cleanCard,
-          expiration_month: expMonth,
-          expiration_year: `20${expYear}`,
+          expiration_month: cardData.expirationMonth,
+          expiration_year: cardData.expirationYear,
           cvv: cardData.cvv,
-          first_name: isAnonymous ? 'Donante' : (donorName.split(' ')[0] || 'Donante'),
-          last_name: isAnonymous ? 'Anonimo' : (donorName.split(' ').slice(1).join(' ') || 'Solidario'),
-          donor_email: isAnonymous ? 'anonimo@donatio.lat' : donorEmail,
+          first_name: firstName,
+          last_name: lastName,
+          donor_email: cardData.email.trim(),
           country: cardData.isInternational ? (cardData.country || 'US') : 'BO',
-          state: cardData.isInternational ? (cardData.stateProvince || 'FL') : cardData.department,
+          state: cardData.isInternational ? (cardData.stateProvince || 'FL') : (cardData.department || 'L'),
           locality: cardData.isInternational ? (cardData.locality || 'Miami') : 'La Paz',
-          address1: cardData.isInternational ? (cardData.address1 || '100 Biscayne Blvd') : 'Av. Principal 123',
+          address1: cardData.address1.trim() || (cardData.isInternational ? '100 Biscayne Blvd' : 'Av. Principal 123'),
           postal_code: cardData.isInternational ? (cardData.postalCode || '33101') : '0000',
           fingerprint_session_id: fingerprintSessionId,
         });
-        console.log('[DonationWidget] check3dsEnrollment response:', enrollRes);
 
         if (enrollRes.isChallengeRequired && enrollRes.stepUpJwt) {
-          console.log('[DonationWidget] Step-Up challenge required!');
           setStepUpJwt(enrollRes.stepUpJwt);
           setPendingAuthTxId(enrollRes.authenticationTransactionId || null);
           return;
         }
 
-        // Frictionless
-        console.log('[DonationWidget] Frictionless flow -> calling executeFinalCheckout...');
+        // Flujo Frictionless -> Captura directa
         await executeFinalCheckout(refNo, enrollRes);
       }
     } catch (err: any) {
@@ -333,11 +324,16 @@ export const DonationWidget: React.FC = () => {
 
   if (!tenant) return null;
 
+  const heroImage = campaign?.banner_url || tenant.logo_url || 'https://images.unsplash.com/photo-1532629345422-7515f3d16bb4?auto=format&fit=crop&w=800&q=80';
+  const heroQuote = campaign?.headline || `"Con tu ayuda, transformamos futuros"`;
+
   return (
-    <>
+    <div id="donar" className="w-full max-w-6xl mx-auto my-8 px-4 sm:px-6">
+      {/* Servicios invisibles de riesgo y perfilado */}
       <ThreatMetrixScript onSessionGenerated={(sid: string) => setFingerprintSessionId(sid)} />
       {cardinalJwt && <CardinalDataCollector jwt={cardinalJwt} />}
 
+      {/* Modal de Desafío OTP 3DS2 */}
       {stepUpJwt && (
         <StepUpChallengeModal
           isOpen={true}
@@ -346,10 +342,12 @@ export const DonationWidget: React.FC = () => {
           onCancel={() => {
             setStepUpJwt(null);
             setIsSubmitting(false);
+            setErrorMessage('La verificación de seguridad 3DS fue cancelada.');
           }}
         />
       )}
 
+      {/* Modal de Código QR Simple */}
       {qrModalData && (
         <QrDisplayModal
           qrData={qrModalData}
@@ -363,11 +361,11 @@ export const DonationWidget: React.FC = () => {
               receiptUrl: receiptUrl || null,
             });
             refreshData();
-            setStep(1);
           }}
         />
       )}
 
+      {/* Modal de Éxito y Recibo Oficial */}
       {successModalData && (
         <DonationSuccessModal
           tenant={tenant}
@@ -375,385 +373,302 @@ export const DonationWidget: React.FC = () => {
           frequency={successModalData.frequency}
           referenceNumber={successModalData.referenceNumber}
           receiptUrl={successModalData.receiptUrl}
-          onClose={() => {
-            setSuccessModalData(null);
-            setStep(1);
-          }}
+          onClose={() => setSuccessModalData(null)}
         />
       )}
 
-      {/* Tarjeta Flotante Minimalista de Donación */}
-      <div className="bg-white rounded-3xl shadow-2xl p-6 sm:p-8 border border-slate-100/90 transition-all duration-300">
+      {/* CONTENEDOR PRINCIPAL 2 COLUMNAS (MOCKUP CERTIFICADO) */}
+      <div className="bg-white rounded-3xl shadow-2xl border border-gray-100 overflow-hidden grid grid-cols-1 lg:grid-cols-12">
         
-        {/* Stepper Superior Minimalista */}
-        <div className="flex items-center justify-between pb-5 mb-6 border-b border-slate-100 text-xs">
-          <div className="flex items-center gap-2 font-bold">
-            <span className={`flex items-center gap-1 ${step >= 1 ? 'text-[var(--tenant-primary)]' : 'text-slate-400'}`}>
-              <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${
-                step >= 1 ? 'bg-[var(--tenant-primary)] text-white' : 'bg-slate-200 text-slate-600'
-              }`}>
-                {step > 1 ? '✓' : '1'}
-              </span>
-              Aporte
-            </span>
-            <span className="text-slate-300">/</span>
-            <span className={`flex items-center gap-1 ${step >= 2 ? 'text-[var(--tenant-primary)]' : 'text-slate-400'}`}>
-              <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${
-                step >= 2 ? 'bg-[var(--tenant-primary)] text-white' : 'bg-slate-200 text-slate-600'
-              }`}>
-                {step > 2 ? '✓' : '2'}
-              </span>
-              Datos
-            </span>
-            <span className="text-slate-300">/</span>
-            <span className={`flex items-center gap-1 ${step === 3 ? 'text-[var(--tenant-primary)]' : 'text-slate-400'}`}>
-              <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${
-                step === 3 ? 'bg-[var(--tenant-primary)] text-white' : 'bg-slate-200 text-slate-600'
-              }`}>
-                3
-              </span>
-              Pago
-            </span>
+        {/* COLUMNA IZQUIERDA: FORMULARIO INTERACTIVO (7 COLUMNAS) */}
+        <div className="lg:col-span-7 p-6 sm:p-8 md:p-10 space-y-6">
+          <div>
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">Tu donación</h2>
+            <p className="text-sm text-gray-500 mt-1">Tu ayuda hace la diferencia. Elige el monto y la frecuencia de tu donación.</p>
           </div>
 
-          <span className="flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full">
-            <ShieldCheck className="w-3.5 h-3.5" /> Pago Seguro
-          </span>
-        </div>
-
-        {errorMessage && (
-          <div className="mb-5 p-3.5 bg-rose-50 border border-rose-200 text-rose-800 rounded-2xl text-xs flex items-start gap-2.5">
-            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
-            <div>
-              <p className="font-bold">Por favor verifica:</p>
-              <p>{errorMessage}</p>
-            </div>
-          </div>
-        )}
-
-        {/* ========================================================================= */}
-        {/* PASO 1: DECIDIR (FRECUENCIA + MONTO + IMPACTO)                            */}
-        {/* ========================================================================= */}
-        {step === 1 && (
-          <div className="space-y-6 animate-fadeIn">
-            <div>
-              <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-                Haz tu aporte
-              </h2>
-              <p className="text-slate-500 text-xs sm:text-sm mt-1">
-                Elige cuánto quieres aportar y con qué frecuencia.
-              </p>
-            </div>
-
-            {/* Selector de Frecuencia */}
-            {campaign?.allowed_frequencies !== 'single_only' && (
-              <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-2xl">
+          {/* 1. Monto de la Donación */}
+          <div>
+            <label className="block text-sm font-bold text-gray-800 mb-2.5">Monto de la donación</label>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+              {tiers.map((t) => (
                 <button
+                  key={t.amount}
                   type="button"
-                  onClick={() => setFrequency('monthly')}
-                  className={`py-2.5 px-3 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center justify-center gap-1.5 ${
-                    frequency === 'monthly'
-                      ? 'bg-white text-slate-900 shadow-sm'
-                      : 'text-slate-600 hover:text-slate-900'
+                  onClick={() => handleSelectTier(t.amount)}
+                  className={`py-3 px-3 rounded-2xl text-center border-2 transition-all font-bold text-sm ${
+                    !isCustom && amount === t.amount
+                      ? 'border-[var(--tenant-primary)] bg-[var(--tenant-primary-soft)] text-[var(--tenant-primary)] shadow-sm'
+                      : 'border-gray-200 text-gray-700 hover:border-gray-300 bg-white'
                   }`}
                 >
-                  <RefreshCw className="w-3.5 h-3.5 text-[var(--tenant-primary)]" />
-                  <span>{campaign?.monthly_label || 'Cada mes'}</span>
+                  <div>{t.amount} {currency}</div>
                 </button>
+              ))}
 
-                {(!campaign || campaign.allowed_frequencies === 'all') && (
-                  <button
-                    type="button"
-                    onClick={() => setFrequency('single')}
-                    className={`py-2.5 px-3 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center justify-center gap-1.5 ${
-                      frequency === 'single'
-                        ? 'bg-white text-slate-900 shadow-sm'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    <Heart className="w-3.5 h-3.5 text-[var(--tenant-primary)]" />
-                    <span>{campaign?.single_label || 'Una sola vez'}</span>
-                  </button>
-                )}
-              </div>
-            )}
-
-            {/* Selector de Montos (Tiers) */}
-            <div className="space-y-3">
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-400">
-                ¿Cuánto quieres aportar?
-              </label>
-
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                {tiers.map((t) => {
-                  const isSelected = !isCustom && amount === t.amount;
-                  return (
-                    <button
-                      key={t.amount}
-                      type="button"
-                      onClick={() => handleSelectTier(t.amount)}
-                      className={`py-3 px-2 rounded-2xl font-black text-sm sm:text-base border-2 transition-all ${
-                        isSelected
-                          ? 'border-[var(--tenant-primary)] bg-[var(--tenant-primary)] text-white shadow-md scale-[1.02]'
-                          : 'border-slate-200 hover:border-slate-300 bg-white text-slate-800'
-                      }`}
-                    >
-                      Bs. {t.amount}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Input Monto Personalizado */}
-              <div className="relative pt-1">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 font-bold text-xs">
-                  Otro Bs.
-                </div>
+              {/* Input personalizado con selector de divisa */}
+              <div className="relative flex items-center col-span-2 sm:col-span-1">
                 <input
                   type="text"
+                  placeholder="Otro"
                   value={customAmount}
                   onChange={handleCustomAmountChange}
-                  placeholder="Ingresa otro monto solidario..."
-                  className={`w-full pl-20 pr-4 py-2.5 rounded-xl border text-xs sm:text-sm font-semibold transition outline-none ${
+                  className={`w-full h-full py-2.5 pl-3.5 pr-14 rounded-2xl border-2 text-sm font-bold outline-none transition-all ${
                     isCustom
-                      ? 'border-[var(--tenant-primary)] ring-2 ring-[var(--tenant-primary)]/20 bg-white'
-                      : 'border-slate-200 bg-slate-50 focus:bg-white focus:border-slate-300'
+                      ? 'border-[var(--tenant-primary)] bg-[var(--tenant-primary-soft)] text-[var(--tenant-primary)]'
+                      : 'border-gray-200 focus:border-[var(--tenant-primary)] text-gray-800'
                   }`}
                 />
+                <button
+                  type="button"
+                  onClick={() => setCurrency(currency === 'Bs' ? 'USD' : 'Bs')}
+                  className="absolute right-2 px-2 py-1 text-xs font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition"
+                >
+                  {currency} ▾
+                </button>
               </div>
-
-              {/* 💡 Impacto Sutil Concreto */}
-              <div className="p-3 bg-amber-50/80 border border-amber-200/80 rounded-2xl flex items-center gap-2.5 text-xs text-amber-900 font-medium">
-                <Sparkles className="w-4 h-4 text-amber-600 shrink-0" />
-                <span className="leading-snug">
-                  <strong>Tu aporte puede cubrir:</strong> {impactLabel}
-                </span>
-              </div>
-            </div>
-
-            {/* Botón Continuar a Paso 2 */}
-            <button
-              type="button"
-              onClick={handleProceedToStep2}
-              disabled={currentAmount <= 0}
-              className={`w-full py-4 rounded-2xl font-black text-base sm:text-lg text-white shadow-xl transition-all duration-200 flex items-center justify-center gap-2 ${
-                currentAmount <= 0
-                  ? 'opacity-60 cursor-not-allowed bg-slate-400'
-                  : 'bg-[var(--tenant-primary)] hover:scale-[1.02] active:scale-[0.98] hover:shadow-2xl'
-              }`}
-            >
-              <Heart className="w-5 h-5 fill-current" />
-              <span>Continuar con Bs. {currentAmount > 0 ? currentAmount : '0'}</span>
-              <ArrowRight className="w-5 h-5" />
-            </button>
-
-            {/* Trust Footer */}
-            <div className="text-center pt-1 text-[11px] text-slate-400 flex items-center justify-center gap-2">
-              <span>🔒 Donación segura</span>
-              <span>•</span>
-              <span>Recibo oficial de {tenant.name}</span>
             </div>
           </div>
-        )}
 
-        {/* ========================================================================= */}
-        {/* PASO 2: TUS DATOS (NOMBRE + CORREO + MÉTODO DE PAGO)                       */}
-        {/* ========================================================================= */}
-        {step === 2 && (
-          <form onSubmit={handleProceedToStep3} className="space-y-6 animate-fadeIn">
-            <div>
-              <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-                Tus datos de contacto
-              </h2>
-              <p className="text-slate-500 text-xs sm:text-sm mt-1">
-                Para enviarte el comprobante oficial de tu donación.
-              </p>
-            </div>
-
-            {/* Inputs de Donante */}
-            <div className="space-y-3">
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">
-                  Nombre Completo
-                </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={donorName}
-                    onChange={(e) => {
-                      setDonorName(e.target.value);
-                      setCardData(prev => ({ ...prev, cardholderName: e.target.value }));
-                    }}
-                    disabled={isAnonymous}
-                    placeholder="Carlos Mamani"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm font-semibold text-slate-800 focus:bg-white focus:ring-2 focus:ring-[var(--tenant-primary)] outline-none transition"
-                    required={!isAnonymous}
-                  />
-                  <User className="w-4 h-4 text-slate-400 absolute right-3.5 top-3" />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">
-                  Correo Electrónico
-                </label>
-                <div className="relative">
-                  <input
-                    type="email"
-                    value={donorEmail}
-                    onChange={(e) => setDonorEmail(e.target.value)}
-                    disabled={isAnonymous}
-                    placeholder="carlos.mamani@ejemplo.com"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm font-semibold text-slate-800 focus:bg-white focus:ring-2 focus:ring-[var(--tenant-primary)] outline-none transition"
-                    required={!isAnonymous}
-                  />
-                  <Mail className="w-4 h-4 text-slate-400 absolute right-3.5 top-3" />
-                </div>
-              </div>
-
-              <div className="pt-1">
-                <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-600 select-none">
-                  <input
-                    type="checkbox"
-                    checked={isAnonymous}
-                    onChange={(e) => setIsAnonymous(e.target.checked)}
-                    className="rounded text-[var(--tenant-primary)] focus:ring-[var(--tenant-primary)] w-4 h-4"
-                  />
-                  <span>Deseo realizar mi donación de forma anónima</span>
-                </label>
-              </div>
-            </div>
-
-            {/* Selector de Método de Pago */}
-            <div className="space-y-2">
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-600">
-                Método de Pago
-              </label>
-
-              <div className="grid grid-cols-2 gap-2.5">
-                <button
-                  type="button"
-                  onClick={() => setPaymentMethod('card')}
-                  className={`p-3 rounded-2xl border-2 flex items-center justify-center gap-2 text-xs sm:text-sm font-bold transition-all ${
-                    paymentMethod === 'card'
-                      ? 'border-[var(--tenant-primary)] bg-[var(--tenant-light)]/40 text-[var(--tenant-primary)]'
-                      : 'border-slate-200 hover:border-slate-300 bg-white text-slate-700'
-                  }`}
-                >
-                  <CreditCard className="w-4 h-4" /> Tarjeta Crédito/Débito
-                </button>
-
-                <button
-                  type="button"
-                  disabled={frequency === 'monthly'}
-                  onClick={() => setPaymentMethod('qr')}
-                  className={`p-3 rounded-2xl border-2 flex items-center justify-center gap-2 text-xs sm:text-sm font-bold transition-all ${
-                    frequency === 'monthly'
-                      ? 'opacity-40 cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400'
-                      : paymentMethod === 'qr'
-                      ? 'border-[var(--tenant-primary)] bg-[var(--tenant-light)]/40 text-[var(--tenant-primary)]'
-                      : 'border-slate-200 hover:border-slate-300 bg-white text-slate-700'
-                  }`}
-                >
-                  <QrCode className="w-4 h-4" /> Código QR Simple
-                </button>
-              </div>
-            </div>
-
-            {/* Botones de Navegación */}
-            <div className="flex items-center gap-3 pt-2">
+          {/* 2. Método de Pago (Tabs) */}
+          <div>
+            <label className="block text-sm font-bold text-gray-800 mb-2.5">Método de pago</label>
+            <div className="grid grid-cols-2 bg-gray-100/90 p-1 rounded-2xl gap-1">
               <button
                 type="button"
-                onClick={() => setStep(1)}
-                className="py-3.5 px-4 rounded-2xl font-bold text-xs sm:text-sm text-slate-600 bg-slate-100 hover:bg-slate-200 transition flex items-center gap-1.5"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                <span>Volver</span>
-              </button>
-
-              <button
-                type="submit"
-                className="flex-1 py-4 rounded-2xl font-black text-base text-white bg-[var(--tenant-primary)] hover:scale-[1.02] active:scale-[0.98] shadow-xl transition-all flex items-center justify-center gap-2"
-              >
-                <span>
-                  {paymentMethod === 'qr' ? 'Generar Código QR' : 'Ir al Pago'} · Bs. {currentAmount}
-                </span>
-                <ArrowRight className="w-4 h-4" />
-              </button>
-            </div>
-          </form>
-        )}
-
-        {/* ========================================================================= */}
-        {/* PASO 3: PAGO SEGURO (FORMULARIO DE TARJETA BANCARIA 3DS2)                 */}
-        {/* ========================================================================= */}
-        {step === 3 && (
-          <form onSubmit={handleProcessDonation} className="space-y-6 animate-fadeIn">
-            <div>
-              <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-                Datos de la Tarjeta
-              </h2>
-              <p className="text-slate-500 text-xs sm:text-sm mt-1">
-                Aporte de <strong>Bs. {currentAmount}</strong> ({frequency === 'monthly' ? 'Mensual recurrente' : 'Aporte único'}).
-              </p>
-            </div>
-
-            {/* Formulario de Tarjeta */}
-            <AtcCreditCardForm
-              cardData={cardData}
-              onChange={setCardData}
-              disabled={isSubmitting}
-            />
-
-            {/* Botones de Acción */}
-            <div className="space-y-3 pt-2">
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className={`w-full py-4 rounded-2xl font-black text-base sm:text-lg text-white shadow-xl transition-all duration-200 flex items-center justify-center gap-2 ${
-                  isSubmitting
-                    ? 'opacity-60 cursor-not-allowed bg-slate-400'
-                    : 'bg-[var(--tenant-primary)] hover:scale-[1.02] active:scale-[0.98] hover:shadow-2xl'
+                onClick={() => setPaymentMethod('card')}
+                className={`py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-2 ${
+                  paymentMethod === 'card'
+                    ? 'bg-white text-gray-900 shadow-sm border border-gray-200/50'
+                    : 'text-gray-500 hover:text-gray-800'
                 }`}
               >
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                    <span>{submittingStep || 'Procesando pago seguro...'}</span>
-                  </>
-                ) : (
-                  <>
-                    <Heart className="w-5 h-5 fill-current" />
-                    <span>
-                      {frequency === 'monthly'
-                        ? `Ser Socio con Bs. ${currentAmount} / mes`
-                        : `Donar Bs. ${currentAmount} Ahora`}
-                    </span>
-                  </>
-                )}
+                <CreditCard className="w-4 h-4 text-amber-500" />
+                <span>Tarjeta Crédito/Débito</span>
               </button>
 
               <button
                 type="button"
-                disabled={isSubmitting}
-                onClick={() => setStep(2)}
-                className="w-full py-2.5 text-center text-xs font-bold text-slate-500 hover:text-slate-800 transition"
+                onClick={() => setPaymentMethod('qr')}
+                className={`py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-2 ${
+                  paymentMethod === 'qr'
+                    ? 'bg-white text-gray-900 shadow-sm border border-gray-200/50'
+                    : 'text-gray-500 hover:text-gray-800'
+                }`}
               >
-                ← Modificar datos de contacto
+                <QrCode className="w-4 h-4 text-sky-600" />
+                <span>Código QR Simple</span>
               </button>
             </div>
+          </div>
 
-            {/* Sello de Seguridad */}
-            <div className="text-center pt-1">
-              <p className="text-[11px] text-slate-500 flex items-center justify-center gap-1.5">
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Cifrado bancario seguro SSL homologado por ATC Red Enlace</span>
+          {/* 3. Frecuencia */}
+          <div>
+            <div className="flex justify-between items-center mb-2.5">
+              <label className="text-sm font-bold text-gray-800">Frecuencia</label>
+              {paymentMethod === 'qr' && (
+                <span className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200/60 px-2 py-0.5 rounded-md font-medium">
+                  QR solo disponible para pago único
+                </span>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-3.5">
+              <button
+                type="button"
+                onClick={() => setFrequency('monthly')}
+                disabled={paymentMethod === 'qr'}
+                className={`p-4 rounded-2xl text-left border-2 transition-all relative ${
+                  paymentMethod === 'qr'
+                    ? 'opacity-40 cursor-not-allowed border-gray-100 bg-gray-50'
+                    : frequency === 'monthly'
+                    ? 'border-[var(--tenant-primary)] bg-[var(--tenant-primary-soft)]'
+                    : 'border-gray-200 hover:border-gray-300 bg-white'
+                }`}
+              >
+                {frequency === 'monthly' && (
+                  <div className="absolute top-3 right-3 w-5 h-5 bg-[var(--tenant-primary)] text-white rounded-full flex items-center justify-center text-xs font-bold">
+                    ✓
+                  </div>
+                )}
+                <div className="font-extrabold text-sm sm:text-base text-gray-900 flex items-center gap-2">
+                  <RefreshCw className="w-4 h-4 text-[var(--tenant-primary)]" />
+                  <span>Mensual</span>
+                </div>
+                <div className="text-xs text-gray-500 mt-1 leading-snug">Se cobrará cada mes automáticamente</div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setFrequency('single')}
+                className={`p-4 rounded-2xl text-left border-2 transition-all relative ${
+                  frequency === 'single'
+                    ? 'border-[var(--tenant-primary)] bg-[var(--tenant-primary-soft)]'
+                    : 'border-gray-200 hover:border-gray-300 bg-white'
+                }`}
+              >
+                {frequency === 'single' && (
+                  <div className="absolute top-3 right-3 w-5 h-5 bg-[var(--tenant-primary)] text-white rounded-full flex items-center justify-center text-xs font-bold">
+                    ✓
+                  </div>
+                )}
+                <div className="font-extrabold text-sm sm:text-base text-gray-900">Una sola vez</div>
+                <div className="text-xs text-gray-500 mt-1 leading-snug">Cobro único al momento</div>
+              </button>
+            </div>
+          </div>
+
+          {/* Banner de Recurrencia Automática */}
+          {frequency === 'monthly' && paymentMethod === 'card' && (
+            <div className="bg-rose-50/70 border border-rose-200/60 p-4 rounded-2xl flex items-start gap-3.5 animate-fadeIn">
+              <Heart className="w-5 h-5 text-rose-500 shrink-0 mt-0.5 fill-rose-500/20" />
+              <div>
+                <h4 className="font-bold text-xs sm:text-sm text-gray-900">Tu donación será recurrente y automática</h4>
+                <p className="text-xs text-gray-600 mt-0.5 leading-relaxed">
+                  El cobro de tu tarjeta se realizará automáticamente cada mes. Puedes cancelar tu suscripción cuando quieras desde tu perfil.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* 4. Formulario de Tarjeta ATC o Mensaje QR */}
+          {paymentMethod === 'card' ? (
+            <div className="pt-1">
+              <AtcCreditCardForm cardData={cardData} onChange={setCardData} disabled={isSubmitting} />
+            </div>
+          ) : (
+            <div className="bg-sky-50/80 border border-sky-200/70 p-5 rounded-2xl flex items-start gap-3.5 animate-fadeIn">
+              <div className="text-2xl">📱</div>
+              <div>
+                <h4 className="font-bold text-sm text-sky-950">Pago inmediato con código QR Simple</h4>
+                <p className="text-xs text-sky-800 mt-1 leading-relaxed">
+                  Generaremos un código QR interoperable único para que lo escanees al instante desde cualquier aplicación bancaria de Bolivia.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Mensaje de Error */}
+          {errorMessage && (
+            <div className="p-3.5 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl flex items-start gap-2 animate-shake">
+              <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+              <span className="font-medium">{errorMessage}</span>
+            </div>
+          )}
+
+          {/* CTA Principal de Pago */}
+          <button
+            type="button"
+            onClick={handleProcessDonation}
+            disabled={isSubmitting}
+            style={{
+              backgroundColor: 'var(--tenant-primary)',
+              color: 'var(--tenant-on-primary)',
+            }}
+            className="w-full py-4 px-6 rounded-2xl font-extrabold text-base sm:text-lg shadow-lg hover:opacity-95 active:scale-[0.99] transition duration-200 flex items-center justify-center gap-2.5 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isSubmitting ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" />
+                <span>{submittingStep || 'Procesando pago seguro...'}</span>
+              </>
+            ) : paymentMethod === 'card' ? (
+              <>
+                <span>💳 Pagar {currentAmount > 0 ? `${currentAmount} ${currency}` : ''}</span>
+                <span className="text-xl">›</span>
+              </>
+            ) : (
+              <>
+                <span>📱 Generar Código QR {currentAmount > 0 ? `(${currentAmount} ${currency})` : ''}</span>
+                <span className="text-xl">›</span>
+              </>
+            )}
+          </button>
+        </div>
+
+        {/* COLUMNA DERECHA: RESUMEN DE DONACIÓN (5 COLUMNAS - STICKY) */}
+        <div className="lg:col-span-5 bg-gray-50/70 border-t lg:border-t-0 lg:border-l border-gray-100 p-6 sm:p-8 flex flex-col justify-between">
+          <div className="space-y-6">
+            <h3 className="text-lg font-bold text-gray-900">Resumen de tu donación</h3>
+
+            {/* Banner de Campaña / Institución */}
+            <div className="relative rounded-2xl overflow-hidden h-40 shadow-md group">
+              <img
+                src={heroImage}
+                alt={tenant.name}
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent flex items-end p-4">
+                <p className="text-white font-bold text-sm sm:text-base leading-snug drop-shadow-md">
+                  {heroQuote}
+                </p>
+              </div>
+            </div>
+
+            {/* Lista de Metadatos */}
+            <div className="space-y-3.5 text-xs sm:text-sm text-gray-600 border-b border-gray-200 pb-5">
+              <div className="flex justify-between items-start gap-3">
+                <span className="text-gray-500 flex items-center gap-1.5">
+                  <Building2 className="w-4 h-4 text-gray-400" />
+                  Institución
+                </span>
+                <span className="font-bold text-gray-900 text-right">{tenant.name}</span>
+              </div>
+
+              <div className="flex justify-between items-center">
+                <span className="text-gray-500 flex items-center gap-1.5">
+                  <Coins className="w-4 h-4 text-gray-400" />
+                  Monto
+                </span>
+                <span className="font-bold text-gray-900">{currentAmount} {currency}</span>
+              </div>
+
+              <div className="flex justify-between items-center">
+                <span className="text-gray-500 flex items-center gap-1.5">
+                  <RefreshCw className="w-4 h-4 text-gray-400" />
+                  Frecuencia
+                </span>
+                <span className="font-bold text-gray-900">{frequency === 'monthly' ? 'Mensual' : 'Una sola vez'}</span>
+              </div>
+
+              <div className="flex justify-between items-center">
+                <span className="text-gray-500 flex items-center gap-1.5">
+                  <CreditCard className="w-4 h-4 text-gray-400" />
+                  Método
+                </span>
+                <span className="font-bold text-gray-900">
+                  {paymentMethod === 'card' ? 'Tarjeta (Cybersource)' : 'Código QR Simple'}
+                </span>
+              </div>
+            </div>
+
+            {/* Total por cobro */}
+            <div className="flex justify-between items-center pt-1">
+              <span className="font-bold text-gray-900 text-base">Total por cobro</span>
+              <span
+                style={{ color: 'var(--tenant-primary)' }}
+                className="font-extrabold text-2xl sm:text-3xl"
+              >
+                {currentAmount} {currency}
+              </span>
+            </div>
+          </div>
+
+          {/* Badge de Seguridad EMVCo 3DS2 */}
+          <div className="mt-8 bg-white p-4 rounded-2xl border border-gray-200/80 shadow-sm flex items-start gap-3.5">
+            <div className="w-8 h-8 rounded-full bg-rose-50 flex items-center justify-center shrink-0 mt-0.5">
+              <ShieldCheck className="w-5 h-5 text-rose-500" />
+            </div>
+            <div>
+              <h4 className="font-bold text-xs sm:text-sm text-gray-900">Tu donación es 100% segura</h4>
+              <p className="text-[11px] text-gray-500 mt-0.5 leading-relaxed">
+                Nuestra plataforma cuenta con seguridad SSL y validación bancaria 3D Secure (EMVCo).
               </p>
             </div>
-          </form>
-        )}
+          </div>
+        </div>
 
       </div>
-    </>
+    </div>
   );
 };

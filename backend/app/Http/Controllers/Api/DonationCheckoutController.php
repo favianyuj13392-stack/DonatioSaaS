@@ -134,9 +134,40 @@ class DonationCheckoutController extends Controller
     public function check3dsEnrollment(Request $request, AtcCybersourceAdapter $gateway): JsonResponse
     {
         $tenant = app('current_tenant');
+        $input = $request->all();
+        if (isset($input['merchantReferenceNumber']) && !isset($input['merchant_reference_number'])) {
+            $input['merchant_reference_number'] = $input['merchantReferenceNumber'];
+        }
+        if (isset($input['referenceId']) && !isset($input['reference_id'])) {
+            $input['reference_id'] = $input['referenceId'];
+        }
+        if (isset($input['fingerprintSessionId']) && !isset($input['fingerprint_session_id'])) {
+            $input['fingerprint_session_id'] = $input['fingerprintSessionId'];
+        }
+        if (isset($input['cardNumber']) && !isset($input['card_number'])) {
+            $input['card_number'] = $input['cardNumber'];
+        }
+        if (isset($input['expirationMonth']) && !isset($input['expiration_month'])) {
+            $input['expiration_month'] = $input['expirationMonth'];
+        }
+        if (isset($input['expirationYear']) && !isset($input['expiration_year'])) {
+            $input['expiration_year'] = $input['expirationYear'];
+        }
+        if (isset($input['firstName']) && !isset($input['first_name'])) {
+            $input['first_name'] = $input['firstName'];
+        }
+        if (isset($input['lastName']) && !isset($input['last_name'])) {
+            $input['last_name'] = $input['lastName'];
+        }
+        if (isset($input['postalCode']) && !isset($input['postal_code'])) {
+            $input['postal_code'] = $input['postalCode'];
+        }
+        if (isset($input['email']) && !isset($input['donor_email'])) {
+            $input['donor_email'] = $input['email'];
+        }
 
         try {
-            $result = $gateway->checkEnrollment($tenant, $request->all());
+            $result = $gateway->checkEnrollment($tenant, $input);
             return response()->json($result);
         } catch (Exception $e) {
             return response()->json(['error' => 'Error en evaluación 3DS2: ' . $e->getMessage()], 500);
@@ -150,9 +181,16 @@ class DonationCheckoutController extends Controller
     public function validate3dsChallenge(Request $request, AtcCybersourceAdapter $gateway): JsonResponse
     {
         $tenant = app('current_tenant');
+        $input = $request->all();
+        if (isset($input['authenticationTransactionId']) && !isset($input['authentication_transaction_id'])) {
+            $input['authentication_transaction_id'] = $input['authenticationTransactionId'];
+        }
+        if (isset($input['merchantReferenceNumber']) && !isset($input['merchant_reference_number'])) {
+            $input['merchant_reference_number'] = $input['merchantReferenceNumber'];
+        }
 
         try {
-            $result = $gateway->validateChallenge($tenant, $request->all());
+            $result = $gateway->validateChallenge($tenant, $input);
             return response()->json($result);
         } catch (Exception $e) {
             return response()->json(['error' => 'Error al validar desafío 3DS: ' . $e->getMessage()], 500);
@@ -166,6 +204,52 @@ class DonationCheckoutController extends Controller
     public function checkout(Request $request, AtcCybersourceAdapter $gateway): JsonResponse
     {
         $tenant = app('current_tenant');
+
+        // Normalizar parámetros camelCase y snake_case para compatibilidad total
+        $input = $request->all();
+        if (isset($input['merchantReferenceNumber']) && !isset($input['merchant_reference_number'])) {
+            $input['merchant_reference_number'] = $input['merchantReferenceNumber'];
+        }
+        if (isset($input['cardNumber']) && !isset($input['card_number'])) {
+            $input['card_number'] = $input['cardNumber'];
+        }
+        if (isset($input['expirationMonth']) && !isset($input['expiration_month'])) {
+            $input['expiration_month'] = $input['expirationMonth'];
+        }
+        if (isset($input['expirationYear']) && !isset($input['expiration_year'])) {
+            $input['expiration_year'] = $input['expirationYear'];
+        }
+        if (isset($input['fingerprintSessionId']) && !isset($input['fingerprint_session_id'])) {
+            $input['fingerprint_session_id'] = $input['fingerprintSessionId'];
+        }
+        if (isset($input['authenticationTransactionId']) && !isset($input['authentication_transaction_id'])) {
+            $input['authentication_transaction_id'] = $input['authenticationTransactionId'];
+        }
+        if (isset($input['threeDSServerTransactionId']) && !isset($input['three_ds_server_transaction_id'])) {
+            $input['three_ds_server_transaction_id'] = $input['threeDSServerTransactionId'];
+        }
+        if (isset($input['postalCode']) && !isset($input['postal_code'])) {
+            $input['postal_code'] = $input['postalCode'];
+        }
+        if (isset($input['firstName']) && !isset($input['first_name'])) {
+            $input['first_name'] = $input['firstName'];
+        }
+        if (isset($input['lastName']) && !isset($input['last_name'])) {
+            $input['last_name'] = $input['lastName'];
+        }
+        if (isset($input['email']) && !isset($input['donor_email'])) {
+            $input['donor_email'] = $input['email'];
+        }
+        if (!isset($input['donor_name']) && (isset($input['first_name']) || isset($input['last_name']))) {
+            $input['donor_name'] = trim(($input['first_name'] ?? '') . ' ' . ($input['last_name'] ?? ''));
+        }
+        if (isset($input['is_recurring']) && !isset($input['frequency'])) {
+            $input['frequency'] = $input['is_recurring'] ? 'monthly' : 'single';
+        }
+        if (isset($input['frequency']) && $input['frequency'] === 'once') {
+            $input['frequency'] = 'single';
+        }
+        $request->merge($input);
 
         $validated = $request->validate([
             'campaign_id'                    => 'nullable|exists:campaigns,id',
