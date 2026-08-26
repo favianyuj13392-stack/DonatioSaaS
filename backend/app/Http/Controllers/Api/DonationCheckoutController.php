@@ -392,23 +392,26 @@ class DonationCheckoutController extends Controller
     }
 
     /**
-     * Genera o retorna los datos del recibo oficial de donación.
-     * Endpoint: GET /api/v1/donations/{id}/receipt
+     * POST/GET /api/v1/donations/stepup-return
+     * Callback endpoint invocado por el iframe ACS de Cardinal Commerce tras completar el desafío 3DS2 OTP.
      */
-    public function downloadReceipt(int $id): JsonResponse
+    public function stepUpReturn(Request $request)
     {
-        $donation = Donation::with(['foundation', 'donor', 'campaign'])->findOrFail($id);
+        $payload = $request->all();
+        \Illuminate\Support\Facades\Log::info('[ATC StepUp Return Callback Payload]:', $payload);
 
-        return response()->json([
-            'receipt_number' => $donation->merchant_reference_number,
-            'foundation'     => $donation->foundation->name,
-            'donor'          => $donation->is_anonymous ? 'Donante Anónimo' : ($donation->donor->name ?? 'Donante'),
-            'amount'         => $donation->amount,
-            'currency'       => $donation->currency,
-            'date'           => $donation->paid_at ?? $donation->created_at,
-            'payment_method' => strtoupper($donation->payment_method),
-            'campaign'       => $donation->campaign->title ?? 'Donación General',
-            'status'         => $donation->status,
-        ]);
+        $html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Step-Up Complete</title></head><body>'
+            . '<script>'
+            . 'try { window.parent.postMessage({ type: "STEP_UP_COMPLETED", payload: ' . json_encode($payload) . ' }, "*"); } catch(e) {}'
+            . '</script>'
+            . '<p style="font-family:sans-serif;text-align:center;color:#4B5563;margin-top:20px;">Autenticación completada con éxito. Procesando...</p>'
+            . '</body></html>';
+
+        return response($html, 200)
+            ->header('Content-Type', 'text/html')
+            ->header('Access-Control-Allow-Origin', '*')
+            ->header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+            ->header('Access-Control-Allow-Headers', '*')
+            ->header('Access-Control-Allow-Private-Network', 'true');
     }
 }

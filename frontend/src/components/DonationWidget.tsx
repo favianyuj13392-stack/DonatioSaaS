@@ -188,6 +188,7 @@ export const DonationWidget: React.FC = () => {
       address1: cardData.isInternational ? (cardData.address1 || '100 Biscayne Blvd') : 'Av. Principal 123',
       postal_code: cardData.isInternational ? (cardData.postalCode || '33101') : '0000',
       fingerprint_session_id: fingerprintSessionId,
+      card_type: cleanCard.startsWith('4') ? 'VISA' : (cleanCard.startsWith('5') ? 'MASTERCARD' : 'AMEX'),
       cavv: auth3ds?.cavv || null,
       eci_raw: auth3ds?.eci || (cleanCard.startsWith('5') ? '02' : '05'),
       xid: auth3ds?.xid || null,

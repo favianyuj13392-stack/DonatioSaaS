@@ -84,7 +84,7 @@ class AtcSignatureService
         $bodyJson = $payload ? json_encode($payload, JSON_UNESCAPED_SLASHES) : null;
         $headers = self::generateAuthHeaders($tenant, $method, $path, $bodyJson);
 
-        $timeoutSeconds = $tenant->is_sandbox ? 2 : 15;
+        $timeoutSeconds = $tenant->is_sandbox ? 5 : 30;
         $httpClient = Http::withHeaders($headers)->timeout($timeoutSeconds);
 
         $response = match (strtoupper($method)) {

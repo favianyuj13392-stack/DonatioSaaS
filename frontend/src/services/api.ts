@@ -44,14 +44,37 @@ function getHeaders(subdomain: string): HeadersInit {
 }
 
 /**
+ * Helper con timeout de 120s para soportar la latencia de 3DS2 y Cardinal Cruise.
+ */
+async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs = 120000): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const res = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    return res;
+  } catch (err: any) {
+    clearTimeout(timeoutId);
+    if (err.name === 'AbortError') {
+      throw new Error('Tiempo de espera agotado al conectar con el servidor de pagos. Por favor intente de nuevo.');
+    }
+    throw err;
+  }
+}
+
+/**
  * Consulta la información institucional completa del tenant (Homepage).
  */
 export async function fetchPublicTenant(subdomain: string): Promise<TenantInstitutionalResponse> {
   const url = `${API_BASE_URL}/public/tenants/${subdomain}`;
-  const response = await fetch(url, {
+  const response = await fetchWithTimeout(url, {
     method: 'GET',
     headers: getHeaders(subdomain),
-  });
+  }, 15000);
 
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
@@ -66,10 +89,10 @@ export async function fetchPublicTenant(subdomain: string): Promise<TenantInstit
  */
 export async function fetchPublicCampaigns(subdomain: string): Promise<CampaignListResponse> {
   const url = `${API_BASE_URL}/public/tenants/${subdomain}/campaigns`;
-  const response = await fetch(url, {
+  const response = await fetchWithTimeout(url, {
     method: 'GET',
     headers: getHeaders(subdomain),
-  });
+  }, 15000);
 
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
@@ -85,10 +108,10 @@ export async function fetchPublicCampaigns(subdomain: string): Promise<CampaignL
 export async function fetchPublicCampaign(subdomain: string, slug?: string): Promise<CampaignDetailResponse> {
   const campaignSlug = slug || 'default';
   const url = `${API_BASE_URL}/public/tenants/${subdomain}/campaigns/${campaignSlug}`;
-  const response = await fetch(url, {
+  const response = await fetchWithTimeout(url, {
     method: 'GET',
     headers: getHeaders(subdomain),
-  });
+  }, 15000);
 
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
@@ -102,24 +125,26 @@ export async function fetchPublicCampaign(subdomain: string, slug?: string): Pro
  * Paso 1: Inicia la sesión 3DS2 con Cybersource (Cardinal Cruise).
  */
 export async function setup3dsSession(subdomain: string, cardData?: any): Promise<{ merchant_reference_number: string; data: any }> {
-  const response = await fetch(`${API_BASE_URL}/donations/3ds-setup`, {
+  const response = await fetchWithTimeout(`${API_BASE_URL}/donations/3ds-setup`, {
     method: 'POST',
     headers: getHeaders(subdomain),
     body: JSON.stringify(cardData || {}),
   });
 
+  const result = await response.json();
+
   if (!response.ok) {
-    throw new Error('Error al inicializar sesión 3DS2');
+    throw new Error(result.error || result.message || 'Error al inicializar sesión 3DS2');
   }
 
-  return response.json();
+  return result;
 }
 
 /**
  * Paso 3: Evalúa el enrolamiento 3DS2 del pagador (Check Enrollment).
  */
 export async function check3dsEnrollment(subdomain: string, payload: any): Promise<any> {
-  const response = await fetch(`${API_BASE_URL}/donations/3ds-enrollment`, {
+  const response = await fetchWithTimeout(`${API_BASE_URL}/donations/3ds-enrollment`, {
     method: 'POST',
     headers: getHeaders(subdomain),
     body: JSON.stringify(payload),
@@ -138,7 +163,7 @@ export async function check3dsEnrollment(subdomain: string, payload: any): Promi
  * Paso 5: Valida la resolución del desafío Step-Up.
  */
 export async function validate3dsChallenge(subdomain: string, payload: any): Promise<any> {
-  const response = await fetch(`${API_BASE_URL}/donations/3ds-validate`, {
+  const response = await fetchWithTimeout(`${API_BASE_URL}/donations/3ds-validate`, {
     method: 'POST',
     headers: getHeaders(subdomain),
     body: JSON.stringify(payload),
@@ -157,7 +182,7 @@ export async function validate3dsChallenge(subdomain: string, payload: any): Pro
  * Paso 6: Procesa la donación con tarjeta de crédito o débito.
  */
 export async function submitCheckout(subdomain: string, payload: CheckoutPayload): Promise<any> {
-  const response = await fetch(`${API_BASE_URL}/donations/checkout`, {
+  const response = await fetchWithTimeout(`${API_BASE_URL}/donations/checkout`, {
     method: 'POST',
     headers: getHeaders(subdomain),
     body: JSON.stringify(payload),
@@ -176,14 +201,15 @@ export async function submitCheckout(subdomain: string, payload: CheckoutPayload
  * Genera un código QR dinámico de ATC.
  */
 export async function generateQrDonation(subdomain: string, payload: any): Promise<QrResponse> {
-  const response = await fetch(`${API_BASE_URL}/donations/qr-generate`, {
+  const response = await fetchWithTimeout(`${API_BASE_URL}/donations/qr-generate`, {
     method: 'POST',
     headers: getHeaders(subdomain),
     body: JSON.stringify(payload),
-  });
+  }, 30000);
 
   if (!response.ok) {
-    throw new Error('Error al generar código QR');
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.message || 'Error al generar código QR');
   }
 
   return response.json();
@@ -193,10 +219,10 @@ export async function generateQrDonation(subdomain: string, payload: any): Promi
  * Consulta el estado de pago del código QR (Polling).
  */
 export async function checkQrStatus(donationId: number): Promise<{ status: string; receipt_url?: string }> {
-  const response = await fetch(`${API_BASE_URL}/donations/${donationId}/qr-status`, {
+  const response = await fetchWithTimeout(`${API_BASE_URL}/donations/${donationId}/qr-status`, {
     method: 'GET',
     headers: { 'Accept': 'application/json' },
-  });
+  }, 10000);
 
   if (!response.ok) {
     throw new Error('Error al consultar estado del QR');
@@ -209,10 +235,10 @@ export async function checkQrStatus(donationId: number): Promise<{ status: strin
  * Valida un token UUID de reactivación de socio (72h).
  */
 export async function validateReactivationToken(token: string): Promise<ReactivationData> {
-  const response = await fetch(`${API_BASE_URL}/public/subscriptions/validate-reactivation/${token}`, {
+  const response = await fetchWithTimeout(`${API_BASE_URL}/public/subscriptions/validate-reactivation/${token}`, {
     method: 'GET',
     headers: { 'Accept': 'application/json' },
-  });
+  }, 15000);
 
   const result = await response.json();
 
@@ -227,14 +253,14 @@ export async function validateReactivationToken(token: string): Promise<Reactiva
  * Confirma la reactivación 1-Click con la tarjeta tokenizada TMS guardada.
  */
 export async function confirmSubscriptionReactivation(token: string, payload?: any): Promise<any> {
-  const response = await fetch(`${API_BASE_URL}/public/subscriptions/confirm-reactivation/${token}`, {
+  const response = await fetchWithTimeout(`${API_BASE_URL}/public/subscriptions/confirm-reactivation/${token}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
     },
     body: JSON.stringify(payload || {}),
-  });
+  }, 30000);
 
   const result = await response.json();
 

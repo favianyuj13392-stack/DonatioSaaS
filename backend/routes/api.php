@@ -30,6 +30,7 @@ Route::prefix('v1')->group(function () {
         Route::post('/donations/3ds-enrollment', [DonationCheckoutController::class, 'check3dsEnrollment']);
         Route::post('/donations/3ds-validate', [DonationCheckoutController::class, 'validate3dsChallenge']);
         Route::post('/donations/checkout', [DonationCheckoutController::class, 'checkout']);
+        Route::match(['get', 'post'], '/donations/stepup-return', [DonationCheckoutController::class, 'stepUpReturn']);
 
         // Donaciones QR
         Route::post('/donations/qr-generate', [DonationCheckoutController::class, 'generateQr']);
