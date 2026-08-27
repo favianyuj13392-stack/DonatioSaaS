@@ -76,9 +76,15 @@ class Atc3dsService
     public static function checkEnrollment(Foundation $tenant, array $data): array
     {
         $path = '/risk/v1/authentications';
-        $sessionId = !empty($data['fingerprint_session_id']) 
+        $rawSessionId = !empty($data['fingerprint_session_id'])
             ? $data['fingerprint_session_id'] 
             : ($tenant->atc_merchant_id . '_' . Str::uuid()->toString());
+
+        // Sanitizar sesión para ThreatMetrix si ya contiene el prefijo del merchantId
+        $merchantId = (string) $tenant->atc_merchant_id;
+        if (!empty($merchantId) && str_starts_with($rawSessionId, $merchantId)) {
+            $rawSessionId = substr($rawSessionId, strlen($merchantId));
+        }
 
         $payload = [
             'clientReferenceInformation' => [
@@ -103,7 +109,7 @@ class Atc3dsService
                 'mobilePhone' => !empty($data['phone']) ? $data['phone'] : '70000000',
             ],
             'deviceInformation' => [
-                'fingerprintSessionId' => $sessionId,
+                'fingerprintSessionId' => $rawSessionId,
             ],
             'consumerAuthenticationInformation' => [
                 'referenceId' => $data['reference_id'] ?? null,
@@ -135,7 +141,7 @@ class Atc3dsService
                 'eci'                        => str_starts_with($cleanNumber, '5') ? '02' : '05',
                 'cavv'                       => 'AAABBBCCC111222333==',
                 'threeDSServerTransactionId' => '3ds_tx_' . Str::random(16),
-                'specificationVersion'       => '2.1.0',
+                'specificationVersion'       => '2.2.0',
             ];
         }
 
@@ -154,10 +160,11 @@ class Atc3dsService
                     'isChallengeRequired'        => false,
                     'status'                     => 'AUTHENTICATION_SUCCESSFUL',
                     'eci'                        => $eciCode,
-                    'cavv'                       => $authInfo['cavv'] ?? null,
+                    'cavv'                       => $authInfo['cavv'] ?? $authInfo['token'] ?? $authInfo['ucafAuthenticationData'] ?? null,
                     'xid'                        => $authInfo['xid'] ?? null,
+                    'veresEnrolled'              => $authInfo['veresEnrolled'] ?? 'Y',
                     'threeDSServerTransactionId' => $authInfo['threeDSServerTransactionId'] ?? null,
-                    'specificationVersion'       => $authInfo['specificationVersion'] ?? '2.1.0',
+                    'specificationVersion'       => $authInfo['specificationVersion'] ?? '2.2.0',
                 ];
             } elseif ($status === 'PENDING_AUTHENTICATION') {
                 return [
@@ -189,7 +196,7 @@ class Atc3dsService
                     'eci'                        => str_starts_with($data['card_number'] ?? '', '5') ? '02' : '05',
                     'cavv'                       => 'AAABBBCCC111222333==',
                     'threeDSServerTransactionId' => '3ds_tx_' . Str::random(16),
-                    'specificationVersion'       => '2.1.0',
+                    'specificationVersion'       => '2.2.0',
                 ];
             }
 
@@ -209,7 +216,7 @@ class Atc3dsService
                 'code' => $data['merchant_reference_number'] ?? ('ATC-REF-' . strtoupper(Str::random(10))),
             ],
             'consumerAuthenticationInformation' => [
-                'authenticationTransactionId' => $data['authentication_transaction_id'],
+                'authenticationTransactionId' => $data['authentication_transaction_id'] ?? $data['authenticationTransactionId'],
             ],
         ];
 
@@ -217,13 +224,16 @@ class Atc3dsService
             $response = AtcSignatureService::request($tenant, 'POST', $path, $payload);
             $authInfo = $response['consumerAuthenticationInformation'] ?? [];
             $status = $authInfo['status'] ?? ($response['status'] ?? 'FAILED');
+            $eci = $authInfo['eci'] ?? ($authInfo['eciRaw'] ?? ($authInfo['ecommerceIndicator'] ?? '05'));
 
             return [
                 'success'                    => ($status === 'AUTHENTICATION_SUCCESSFUL'),
                 'status'                     => $status,
-                'eci'                        => $authInfo['ecommerceIndicator'] ?? '05',
-                'cavv'                       => $authInfo['cavv'] ?? null,
+                'eci'                        => $eci,
+                'cavv'                       => $authInfo['cavv'] ?? $authInfo['token'] ?? $authInfo['ucafAuthenticationData'] ?? null,
+                'xid'                        => $authInfo['xid'] ?? null,
                 'threeDSServerTransactionId' => $authInfo['threeDSServerTransactionId'] ?? null,
+                'specificationVersion'       => $authInfo['specificationVersion'] ?? '2.2.0',
                 'raw'                        => $response,
             ];
         } catch (Exception $e) {
@@ -253,7 +263,7 @@ class Atc3dsService
         $address1 = !empty($data['address1']) ? $data['address1'] : 'Av. Principal 123';
         $postalCode = !empty($data['postal_code']) ? $data['postal_code'] : ($country === 'BO' ? '0000' : ($country === 'US' ? '33101' : '00000'));
 
-        $fullName = $data['donor_name'] ?? 'Donante Anónimo';
+        $fullName = $data['donor_name'] ?? ($data['first_name'] ?? 'Donante Anónimo');
         $nameParts = explode(' ', trim($fullName));
         $firstName = $data['first_name'] ?? ($nameParts[0] ?? 'Donante');
         $lastName = $data['last_name'] ?? (isset($nameParts[1]) ? implode(' ', array_slice($nameParts, 1)) : 'Solidario');
@@ -261,7 +271,7 @@ class Atc3dsService
         return [
             'firstName'          => $firstName,
             'lastName'           => $lastName,
-            'email'              => !empty($data['donor_email']) ? $data['donor_email'] : 'donante@donatio.lat',
+            'email'              => !empty($data['donor_email']) ? $data['donor_email'] : (!empty($data['email']) ? $data['email'] : 'donante@donatio.lat'),
             'address1'           => $address1,
             'locality'           => $locality,
             'administrativeArea' => $state,

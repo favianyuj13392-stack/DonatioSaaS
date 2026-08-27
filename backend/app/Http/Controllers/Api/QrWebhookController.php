@@ -47,19 +47,25 @@ class QrWebhookController extends Controller
             DB::statement("SET app.current_tenant_id = '{$tenant->id}'");
         }
 
-        // 3. Buscar la donación
-        $donation = Donation::where('merchant_reference_number', $merchantRef)->first();
+        // 3. Ejecutar transacción con Pessimistic Locking para prevenir Race Conditions en webhooks concurrentes
+        return DB::transaction(function () use ($merchantRef, $request, $tenant) {
+            $donation = Donation::where('merchant_reference_number', $merchantRef)
+                ->lockForUpdate()
+                ->first();
 
-        if (!$donation) {
-            return response()->json(['error' => 'Donación no encontrada'], 404);
-        }
+            if (!$donation) {
+                return response()->json(['error' => 'Donación no encontrada'], 404);
+            }
 
-        if ($donation->status === 'completed') {
-            return response()->json(['status' => 'already_processed', 'message' => 'Donación ya confirmada']);
-        }
+            // Idempotencia estricta: si ya fue procesada, responder inmediatamente sin duplicar registros contables
+            if ($donation->status === 'completed') {
+                return response()->json([
+                    'status'  => 'already_processed',
+                    'message' => 'Donación ya confirmada previamente',
+                ]);
+            }
 
-        // 4. Actualizar estado de la donación
-        DB::transaction(function () use ($donation, $request, $tenant) {
+            // 4. Actualizar estado de la donación
             $donation->update([
                 'status'                 => 'completed',
                 'paid_at'                => now(),
@@ -73,7 +79,7 @@ class QrWebhookController extends Controller
             }
 
             // 5. Registrar la comisión SaaS en tenant_billing_ledgers (2%)
-            $feePercentage = 2.00;
+            $feePercentage = (float) ($tenant->saas_fee_qr ?? 2.00);
             $feeAmount = round(((float) $donation->amount * $feePercentage) / 100, 2);
 
             TenantBillingLedger::create([
@@ -85,13 +91,13 @@ class QrWebhookController extends Controller
                 'billing_period'      => now()->format('Y-m'),
                 'status'              => 'pending',
             ]);
+
+            Log::info("Donación QR confirmada (Pessimistic Lock): {$merchantRef} para {$tenant->name}");
+
+            return response()->json([
+                'status'  => 'success',
+                'message' => 'Pago QR confirmado exitosamente',
+            ]);
         });
-
-        Log::info("Donación QR confirmada: {$merchantRef} para {$tenant->name}");
-
-        return response()->json([
-            'status'  => 'success',
-            'message' => 'Pago QR confirmado exitosamente',
-        ]);
     }
 }

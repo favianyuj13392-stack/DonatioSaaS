@@ -11,3 +11,5 @@
 /bootstrap/cache/*
 /public/storage
 /public/hot
+/frontend/screenshots/donation_form_internacional.png
+/frontend/screenshots/donation_form_nacional.png

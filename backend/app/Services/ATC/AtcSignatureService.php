@@ -76,6 +76,7 @@ class AtcSignatureService
 
     /**
      * Ejecuta una petición HTTP autenticada a Cybersource para el tenant.
+     * Implementa timeouts explícitos de conexión (5s) y lectura (20s) sin reintentos automáticos ciegos.
      */
     public static function request(Foundation $tenant, string $method, string $path, ?array $payload = null): array
     {
@@ -84,8 +85,12 @@ class AtcSignatureService
         $bodyJson = $payload ? json_encode($payload, JSON_UNESCAPED_SLASHES) : null;
         $headers = self::generateAuthHeaders($tenant, $method, $path, $bodyJson);
 
-        $timeoutSeconds = $tenant->is_sandbox ? 2 : 15;
-        $httpClient = Http::withHeaders($headers)->timeout($timeoutSeconds);
+        $connectTimeout = $tenant->is_sandbox ? 3 : 5;
+        $timeoutSeconds = $tenant->is_sandbox ? 10 : 20;
+
+        $httpClient = Http::withHeaders($headers)
+            ->connectTimeout($connectTimeout)
+            ->timeout($timeoutSeconds);
 
         $response = match (strtoupper($method)) {
             'GET'    => $httpClient->get($url),
