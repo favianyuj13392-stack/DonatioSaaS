@@ -1,0 +1,112 @@
+services:
+  # 1. Backend API (Laravel 12 + FrankenPHP / Caddy)
+  donatio_api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: donatio_api
+    restart: unless-stopped
+    env_file:
+      - .env.production
+    volumes:
+      - donatio_storage:/app/storage
+    networks:
+      - donatio_net
+      - proxy
+    depends_on:
+      donatio_postgres:
+        condition: service_healthy
+      donatio_redis:
+        condition: service_started
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=proxy"
+      - "traefik.http.routers.donatio-api.rule=Host(`api-donatio.darkosyn.com`)"
+      - "traefik.http.routers.donatio-api.entrypoints=websecure"
+      - "traefik.http.routers.donatio-api.tls=true"
+      - "traefik.http.routers.donatio-api.tls.certresolver=letsencrypt"
+      - "traefik.http.services.donatio-api.loadbalancer.server.port=80"
+      - "traefik.http.middlewares.donatio-ratelimit.ratelimit.average=30"
+      - "traefik.http.middlewares.donatio-ratelimit.ratelimit.burst=50"
+      - "traefik.http.routers.donatio-api.middlewares=donatio-ratelimit@docker"
+
+  # 2. Frontend SPA (Vite / React / Nginx)
+  donatio_frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: donatio_frontend
+    restart: unless-stopped
+    networks:
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=proxy"
+      - "traefik.http.routers.donatio-frontend.rule=Host(`donatio.darkosyn.com`)"
+      - "traefik.http.routers.donatio-frontend.entrypoints=websecure"
+      - "traefik.http.routers.donatio-frontend.tls=true"
+      - "traefik.http.routers.donatio-frontend.tls.certresolver=letsencrypt"
+      - "traefik.http.services.donatio-frontend.loadbalancer.server.port=80"
+
+  # 3. Queue Worker (Procesamiento Asíncrono de Cobros Recurrentes)
+  donatio_worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: donatio_worker
+    restart: unless-stopped
+    command: php /app/artisan queue:work redis --queue=billing,default --tries=3 --timeout=90
+    env_file:
+      - .env.production
+    volumes:
+      - donatio_storage:/app/storage
+    networks:
+      - donatio_net
+    depends_on:
+      donatio_postgres:
+        condition: service_healthy
+      donatio_redis:
+        condition: service_started
+
+  # 4. Base de Datos Aislada PostgreSQL 16 (Row Level Security)
+  donatio_postgres:
+    image: postgres:16-alpine
+    container_name: donatio_postgres
+    restart: unless-stopped
+    env_file:
+      - .env.production
+    environment:
+      POSTGRES_DB: ${DB_DATABASE:-donatio_saas}
+      POSTGRES_USER: ${DB_USERNAME:-donatio_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - donatio_pgdata_prod:/var/lib/postgresql/data
+    networks:
+      - donatio_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-donatio_user} -d ${DB_DATABASE:-donatio_saas}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # 5. Caché y Colas Redis 7
+  donatio_redis:
+    image: redis:7-alpine
+    container_name: donatio_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - donatio_redisdata_prod:/data
+    networks:
+      - donatio_net
+
+networks:
+  donatio_net:
+    driver: bridge
+  proxy:
+    external: true
+
+volumes:
+  donatio_pgdata_prod:
+  donatio_redisdata_prod:
+  donatio_storage:
