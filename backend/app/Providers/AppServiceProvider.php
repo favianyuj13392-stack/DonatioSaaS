@@ -3,7 +3,9 @@
 namespace App\Providers;
 
 use App\Models\Campaign;
+use App\Models\Foundation;
 use App\Observers\CampaignObserver;
+use App\Observers\FoundationObserver;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\ServiceProvider;
 
@@ -26,7 +28,8 @@ class AppServiceProvider extends ServiceProvider
         Model::preventLazyLoading(!app()->isProduction());
         Model::shouldBeStrict(!app()->isProduction());
 
-        // Registro de Observers
+        // Registro de Observers para sincronización y purga de caché
         Campaign::observe(CampaignObserver::class);
+        Foundation::observe(FoundationObserver::class);
     }
 }
