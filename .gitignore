@@ -32,6 +32,9 @@ test-results/
 playwright-report/
 blob-report/
 playwright/.cache/
+frontend/screenshots/donation_form_internacional.png
+frontend/screenshots/donation_form_nacional.png
+frontend/screenshots/
 
 # OS & IDE
 .DS_Store
