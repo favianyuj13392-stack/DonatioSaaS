@@ -1,7 +1,7 @@
 import React from 'react';
 import { useTenant } from '../context/TenantContext';
 import { DonationWidget } from './DonationWidget';
-import { TrendingUp, Users } from 'lucide-react';
+import { TrendingUp } from 'lucide-react';
 
 export const HeroSection: React.FC = () => {
   const { tenant, campaign, routeMode } = useTenant();
@@ -12,10 +12,6 @@ export const HeroSection: React.FC = () => {
   const monetaryGoal = isCampaignMode ? (campaign?.monetary_goal || 0) : 0;
   const currentAmount = isCampaignMode ? (campaign?.current_amount || 0) : 0;
   const pct = monetaryGoal > 0 ? Math.min(100, Math.round((currentAmount / monetaryGoal) * 100)) : 0;
-
-  const banner = isCampaignMode
-    ? (campaign?.banner_url || tenant.hero_image_url || tenant.logo_url)
-    : (tenant.hero_image_url || tenant.logo_url);
 
   const headline = isCampaignMode
     ? (campaign?.headline || campaign?.title || tenant.name)
