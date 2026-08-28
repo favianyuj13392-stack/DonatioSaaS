@@ -3,10 +3,10 @@
 namespace App\Filament\Widgets;
 
 use App\Models\Donation;
+use App\Models\ExchangeRate;
 use App\Models\Foundation;
 use App\Models\Subscription;
 use App\Models\TenantBillingLedger;
-use App\Services\ExchangeRate\ExchangeRateService;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 
@@ -18,11 +18,15 @@ class FinancialStatsOverview extends BaseWidget
     protected function getStats(): array
     {
         $currentMonth = now()->startOfMonth();
-        $rateService = app(ExchangeRateService::class);
-        $latestRate = $rateService->getLatestConfirmedRate('USD/BOB');
-        $exchangeRate = $latestRate ? (float) $latestRate->sell_rate : $rateService->getCurrentSellRate('USD/BOB');
+        $latestRate = ExchangeRate::where('currency_pair', 'USD/BOB')
+            ->where('effective_date', '<=', now()->toDateString())
+            ->orderByDesc('effective_date')
+            ->orderByDesc('id')
+            ->first();
+
+        $exchangeRate = $latestRate ? (float) $latestRate->sell_rate : 11.93;
         $buyRate = $latestRate ? (float) $latestRate->buy_rate : 11.83;
-        $rateSource = $latestRate ? $latestRate->source : 'BCB';
+        $rateSource = $latestRate ? $latestRate->source : 'BCB_CUCU';
 
         // 1. GMV Total del Mes (Agrupado por moneda)
         $bobGmv = (float) Donation::where('status', 'completed')

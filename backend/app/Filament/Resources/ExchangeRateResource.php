@@ -89,13 +89,15 @@ class ExchangeRateResource extends Resource
 
                 Tables\Columns\TextColumn::make('buy_rate')
                     ->label('Compra (TCO)')
-                    ->money('BOB', 4)
+                    ->prefix('Bs. ')
+                    ->numeric(decimalPlaces: 4)
                     ->weight('bold')
                     ->sortable(),
 
                 Tables\Columns\TextColumn::make('sell_rate')
                     ->label('Venta (Tope BCB)')
-                    ->money('BOB', 4)
+                    ->prefix('Bs. ')
+                    ->numeric(decimalPlaces: 4)
                     ->weight('bold')
                     ->color('success')
                     ->sortable(),

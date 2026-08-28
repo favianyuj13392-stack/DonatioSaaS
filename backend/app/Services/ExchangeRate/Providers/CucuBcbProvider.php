@@ -13,7 +13,7 @@ class CucuBcbProvider implements ExchangeRateProviderInterface
 
     public function __construct(?string $endpoint = null)
     {
-        $this->endpoint = $endpoint ?? config('services.cucu.endpoint', 'https://apibcb.cucu.bo/api/v1/tc');
+        $this->endpoint = $endpoint ?? config('services.cucu.endpoint', 'https://apibcb.cucu.bo/api/v1/tc/usd');
     }
 
     public function getProviderName(): string
