@@ -3,7 +3,7 @@ import { useTenant } from '../context/TenantContext';
 import { ShieldCheck, Scale, FileText } from 'lucide-react';
 
 export const LegalIdentitySection: React.FC = () => {
-  const { tenant } = useTenant();
+  const { tenant, paymentProviders } = useTenant();
 
   if (!tenant) return null;
 
@@ -11,6 +11,11 @@ export const LegalIdentitySection: React.FC = () => {
   const hasLegalId = !!tenant.legal_id_details;
   const hasNit = !!tenant.nit;
   const hasCity = !!tenant.location_city;
+
+  const activeProviders = paymentProviders?.filter(p => p.is_active !== false) || [];
+  const providersText = activeProviders.length > 0
+    ? activeProviders.map(p => p.name).join(', ')
+    : null;
 
   // Si no hay ningún dato legal configurado, no renderizar nada
   if (!hasLegalName && !hasLegalId && !hasNit && !hasCity) {
@@ -51,7 +56,11 @@ export const LegalIdentitySection: React.FC = () => {
       <div className="text-center text-[11px] text-slate-500">
         <span className="inline-flex items-center gap-1">
           <ShieldCheck className="w-3 h-3 text-emerald-500" />
-          <span>Recaudación solidaria autorizada y procesada de forma segura por ATC Red Enlace</span>
+          <span>
+            {providersText
+              ? `Recaudación solidaria autorizada y procesada de forma segura por ${providersText}`
+              : 'Recaudación solidaria autorizada con procesamiento seguro certificado'}
+          </span>
         </span>
       </div>
     </div>
