@@ -84,10 +84,11 @@ services:
     networks:
       - donatio_net
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-donatio_user} -d ${DB_DATABASE:-donatio_saas}"]
+      test: ["CMD-SHELL", "pg_isready -h localhost -U ${DB_USERNAME:-donatio_user} -d ${DB_DATABASE:-donatio_saas}"]
       interval: 5s
       timeout: 5s
       retries: 5
+      start_period: 20s
 
   # 5. Caché y Colas Redis 7
   donatio_redis:
