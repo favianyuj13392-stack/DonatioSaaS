@@ -7,7 +7,7 @@ services:
     container_name: donatio_api
     restart: unless-stopped
     env_file:
-      - .env.production
+      - .env
     volumes:
       - donatio_storage:/app/storage
     networks:
@@ -57,7 +57,7 @@ services:
     restart: unless-stopped
     command: php /app/artisan queue:work redis --queue=billing,default --tries=3 --timeout=90
     env_file:
-      - .env.production
+      - .env
     volumes:
       - donatio_storage:/app/storage
     networks:
@@ -74,11 +74,11 @@ services:
     container_name: donatio_postgres
     restart: unless-stopped
     env_file:
-      - .env.production
+      - .env
     environment:
       POSTGRES_DB: ${DB_DATABASE:-donatio_saas}
       POSTGRES_USER: ${DB_USERNAME:-donatio_user}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-Donatio_SaaS_2026_SecureKey!}
     volumes:
       - donatio_pgdata_prod:/var/lib/postgresql/data
     networks:
