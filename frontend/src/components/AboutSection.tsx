@@ -1,9 +1,12 @@
-import React from 'react';
+import React, { type RefObject } from 'react';
 import { useTenant } from '../context/TenantContext';
-import { Target, Compass, Sparkles, Award } from 'lucide-react';
+import { Target, Compass, Sparkles } from 'lucide-react';
+import { useScrollAnimation } from '../hooks/useScrollAnimation';
 
 export const AboutSection: React.FC = () => {
   const { tenant } = useTenant();
+  const { ref: refMain, isVisible: mainVisible } = useScrollAnimation();
+  const { ref: refCards, isVisible: cardsVisible } = useScrollAnimation({ threshold: 0.1 });
 
   if (!tenant) return null;
 
@@ -12,63 +15,118 @@ export const AboutSection: React.FC = () => {
   const hasVision = !!tenant.vision;
   const hasValues = !!(tenant.values && tenant.values.length > 0);
 
-  // Si no hay información institucional, no renderizar sección vacía
   if (!hasAbout && !hasMission && !hasVision && !hasValues) {
     return null;
   }
 
   return (
-    <section id="quienes-somos" className="py-16 sm:py-24 bg-white border-t border-slate-100">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
-        
-        {/* Encabezado */}
-        <div className="text-center max-w-3xl mx-auto space-y-3">
-          <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider badge-tenant">
-            <Award className="w-3.5 h-3.5" />
-            <span>Nuestra Identidad</span>
+    <section
+      id="quienes-somos"
+      className="relative overflow-hidden section-tenant-primary"
+    >
+      {/* Decorative large circle — editorial accent */}
+      <div
+        className="absolute -top-32 -right-32 w-[500px] h-[500px] rounded-full pointer-events-none"
+        style={{ backgroundColor: 'rgba(255,255,255,0.06)' }}
+        aria-hidden="true"
+      />
+      <div
+        className="absolute -bottom-48 -left-24 w-[400px] h-[400px] rounded-full pointer-events-none"
+        style={{ backgroundColor: 'rgba(0,0,0,0.08)' }}
+        aria-hidden="true"
+      />
+
+      {/* ── TOP BLOCK: About text as pull quote or Section Title ── */}
+      <div
+        ref={refMain as RefObject<HTMLDivElement>}
+        className={`max-w-7xl mx-auto px-6 sm:px-10 lg:px-16 pt-20 pb-12 transition-all duration-700 ease-out ${mainVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
+      >
+        {/* Label */}
+        <div className="mb-6 flex items-center gap-3">
+          <div
+            className="w-10 h-10 rounded-xl flex items-center justify-center"
+            style={{ backgroundColor: 'rgba(255,255,255,0.15)' }}
+          >
+            <Sparkles className="w-5 h-5 text-white" />
           </div>
-          <h2 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight">
-            Quiénes Somos
-          </h2>
-          {hasAbout && (
-            <p className="text-base sm:text-lg text-slate-600 leading-relaxed pt-2">
-              {tenant.about_text}
-            </p>
-          )}
+          <span className="text-[11px] font-black uppercase tracking-[0.2em] text-white/60">
+            Nuestra Identidad
+          </span>
         </div>
 
-        {/* Misión y Visión (Grid adaptativo) */}
+        {/* Section title */}
+        <h2
+          className="text-white font-black leading-[0.95] tracking-tight mb-8"
+          style={{ fontSize: 'clamp(2.2rem, 4.5vw, 4.2rem)' }}
+        >
+          Quiénes Somos
+        </h2>
+
+        {/* Pull quote (if about_text exists) */}
+        {hasAbout && (
+          <blockquote className="pull-quote max-w-3xl mb-4">
+            <p className="text-white/90 text-xl sm:text-2xl lg:text-3xl font-semibold leading-relaxed italic">
+              "{tenant.about_text}"
+            </p>
+          </blockquote>
+        )}
+      </div>
+
+      {/* ── DIVIDER (if there are mission/vision below) ── */}
+      {(hasMission || hasVision || hasValues) && (
+        <div className="max-w-7xl mx-auto px-6 sm:px-10 lg:px-16">
+          <div style={{ borderTop: '1px solid rgba(255,255,255,0.15)' }} />
+        </div>
+      )}
+
+      {/* ── BOTTOM BLOCK: Mission + Vision + Values ── */}
+      <div
+        ref={refCards as RefObject<HTMLDivElement>}
+        className="max-w-7xl mx-auto px-6 sm:px-10 lg:px-16 py-14 sm:py-16"
+      >
         {(hasMission || hasVision) && (
-          <div className={`grid grid-cols-1 ${hasMission && hasVision ? 'md:grid-cols-2' : 'max-w-3xl mx-auto'} gap-8`}>
+          <div className={`grid grid-cols-1 ${hasMission && hasVision ? 'lg:grid-cols-2' : ''} gap-0 lg:gap-12 transition-all duration-700 ease-out delay-100 ${cardsVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
             {hasMission && (
-              <div className="bg-slate-50/80 rounded-3xl p-8 border border-slate-200/70 space-y-4 relative overflow-hidden group hover:border-slate-300 transition shadow-xs">
-                <div
-                  className="w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-xs"
-                  style={{ backgroundColor: 'var(--tenant-primary)' }}
-                >
-                  <Target className="w-6 h-6" />
+              <div className="space-y-4 py-8 lg:py-0">
+                <div className="flex items-center gap-3 mb-4">
+                  <div
+                    className="w-9 h-9 rounded-lg flex items-center justify-center"
+                    style={{ backgroundColor: 'rgba(255,255,255,0.15)' }}
+                  >
+                    <Target className="w-5 h-5 text-white" />
+                  </div>
+                  <h3 className="text-[11px] font-black uppercase tracking-[0.18em] text-white/60">
+                    Nuestra Misión
+                  </h3>
                 </div>
-                <h3 className="text-xl font-black text-slate-900 tracking-tight">
-                  Nuestra Misión
-                </h3>
-                <p className="text-slate-600 text-sm sm:text-base leading-relaxed">
+                <p className="text-white text-lg sm:text-xl font-semibold leading-relaxed">
                   {tenant.mission}
                 </p>
               </div>
             )}
 
+            {/* Vertical divider between mission and vision */}
+            {hasMission && hasVision && (
+              <div className="hidden lg:block" aria-hidden="true" />
+            )}
+            {hasMission && hasVision && (
+              <div className="lg:hidden" style={{ borderTop: '1px solid rgba(255,255,255,0.15)' }} aria-hidden="true" />
+            )}
+
             {hasVision && (
-              <div className="bg-slate-50/80 rounded-3xl p-8 border border-slate-200/70 space-y-4 relative overflow-hidden group hover:border-slate-300 transition shadow-xs">
-                <div
-                  className="w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-xs"
-                  style={{ backgroundColor: 'var(--tenant-secondary, var(--tenant-primary))' }}
-                >
-                  <Compass className="w-6 h-6" />
+              <div className="space-y-4 py-8 lg:py-0">
+                <div className="flex items-center gap-3 mb-4">
+                  <div
+                    className="w-9 h-9 rounded-lg flex items-center justify-center"
+                    style={{ backgroundColor: 'rgba(255,255,255,0.15)' }}
+                  >
+                    <Compass className="w-5 h-5 text-white" />
+                  </div>
+                  <h3 className="text-[11px] font-black uppercase tracking-[0.18em] text-white/60">
+                    Nuestra Visión
+                  </h3>
                 </div>
-                <h3 className="text-xl font-black text-slate-900 tracking-tight">
-                  Nuestra Visión
-                </h3>
-                <p className="text-slate-600 text-sm sm:text-base leading-relaxed">
+                <p className="text-white text-lg sm:text-xl font-semibold leading-relaxed">
                   {tenant.vision}
                 </p>
               </div>
@@ -76,18 +134,21 @@ export const AboutSection: React.FC = () => {
           </div>
         )}
 
-        {/* Valores Institucionales */}
+        {/* Values */}
         {hasValues && (
-          <div className="bg-slate-50/50 rounded-2xl p-6 sm:p-8 border border-slate-200/50 text-center space-y-4">
-            <div className="flex items-center justify-center gap-1.5 text-xs font-bold uppercase tracking-wider text-slate-400">
-              <Sparkles className="w-4 h-4 text-amber-500" />
-              <span>Valores y Principios que nos Guían</span>
-            </div>
-            <div className="flex flex-wrap justify-center gap-3">
+          <div
+            className={`mt-12 pt-8 transition-all duration-700 ease-out delay-200 ${cardsVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
+            style={{ borderTop: '1px solid rgba(255,255,255,0.15)' }}
+          >
+            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-white/50 mb-5">
+              Valores y Principios
+            </p>
+            <div className="flex flex-wrap gap-3">
               {tenant.values?.map((val, idx) => (
                 <span
                   key={idx}
-                  className="px-4 py-2 bg-white rounded-xl text-xs sm:text-sm font-bold text-slate-800 border border-slate-200/80 shadow-2xs"
+                  className="px-4 py-2 rounded-xl text-sm font-bold text-white border"
+                  style={{ borderColor: 'rgba(255,255,255,0.25)', backgroundColor: 'rgba(255,255,255,0.10)' }}
                 >
                   {val}
                 </span>
@@ -95,7 +156,6 @@ export const AboutSection: React.FC = () => {
             </div>
           </div>
         )}
-
       </div>
     </section>
   );
