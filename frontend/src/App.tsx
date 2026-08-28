@@ -14,6 +14,7 @@ import { ContactFooterSection } from './components/ContactFooterSection';
 import { SkeletonLoader } from './components/SkeletonLoader';
 import { ReactivationPage } from './components/ReactivationPage';
 import { CampaignsListPage } from './components/CampaignsListPage';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { AlertCircle } from 'lucide-react';
 
 const MainLayout: React.FC = () => {
@@ -27,7 +28,7 @@ const MainLayout: React.FC = () => {
     const isSuspended = error.toLowerCase().includes('suspendida') || error.toLowerCase().includes('mantenimiento');
 
     return (
-      <div className="min-h-screen flex items-center justify-center p-4 bg-slate-50">
+      <div className="min-h-screen flex items-center justify-center p-4 bg-slate-50" role="alert" aria-live="assertive">
         <div className="max-w-md w-full bg-white rounded-3xl p-8 shadow-xl text-center space-y-4 border border-slate-100">
           <div
             className={`w-14 h-14 ${
@@ -52,8 +53,11 @@ const MainLayout: React.FC = () => {
   if (routeMode === 'campaigns_list') {
     return (
       <div className="min-h-screen flex flex-col bg-white antialiased selection:bg-[var(--tenant-primary)] selection:text-white">
+        <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-[100] focus:px-4 focus:py-2 focus:bg-white focus:text-slate-900 focus:rounded-lg focus:shadow-lg focus:font-bold focus:text-sm">
+          Saltar al contenido principal
+        </a>
         <Navbar />
-        <main className="flex-1">
+        <main id="main-content" className="flex-1">
           <CampaignsListPage />
         </main>
         <ContactFooterSection />
@@ -68,11 +72,13 @@ const MainLayout: React.FC = () => {
       {/* ========================================================================= */}
       {/* ZONE 1: TOP (Navbar Oficial + Adaptive Hero & Donation Flow)              */}
       {/* ========================================================================= */}
+      <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-[100] focus:px-4 focus:py-2 focus:bg-white focus:text-slate-900 focus:rounded-lg focus:shadow-lg focus:font-bold focus:text-sm">
+        Saltar al contenido principal
+      </a>
       <Navbar />
 
-      <main>
+      <main id="main-content" className="flex-1">
         <HeroSection />
-      </main>
 
       {/* ========================================================================= */}
       {/* ZONE 2: CONTENT (Quiénes somos, Qué hacemos, Impacto, Historia)           */}
@@ -124,6 +130,8 @@ const MainLayout: React.FC = () => {
       {/* ========================================================================= */}
       {otherCampaigns && otherCampaigns.length > 0 && <OtherCampaignsSection />}
 
+      </main>
+
       {/* ========================================================================= */}
       {/* ZONE 5: SYSTEM (Footer Institucional, Enlaces y Procesamiento Seguro)     */}
       {/* ========================================================================= */}
@@ -136,13 +144,19 @@ export const App: React.FC = () => {
   // Detectar si la ruta actual es de reactivación de socio: /reactivar/:token
   const pathParts = window.location.pathname.split('/');
   if (pathParts[1] === 'reactivar' && pathParts[2]) {
-    return <ReactivationPage token={pathParts[2]} />;
+    return (
+      <ErrorBoundary>
+        <ReactivationPage token={pathParts[2]} />
+      </ErrorBoundary>
+    );
   }
 
   return (
-    <TenantProvider>
-      <MainLayout />
-    </TenantProvider>
+    <ErrorBoundary>
+      <TenantProvider>
+        <MainLayout />
+      </TenantProvider>
+    </ErrorBoundary>
   );
 };
 
