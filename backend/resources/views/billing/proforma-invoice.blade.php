@@ -271,15 +271,15 @@
                     <span>Bs. {{ number_format($totalGrossBob, 2) }}</span>
                 </div>
                 <div class="total-row">
-                    <span>Arancel ATC Est. (~2.45%):</span>
+                    <span>Arancel ATC (Retenido automáticamente por la Red de Pagos):</span>
                     <span>Bs. {{ number_format($totalAtcFeeBob, 2) }}</span>
                 </div>
                 <div class="total-row">
-                    <span>Neto Acreditado a ONG:</span>
+                    <span>Neto Acreditado a la Fundación:</span>
                     <span>Bs. {{ number_format($totalGrossBob - ($totalSaasFeeBob + $totalAtcFeeBob), 2) }}</span>
                 </div>
                 <div class="total-row grand-total">
-                    <span>TOTAL A PAGAR:</span>
+                    <span>TOTAL A TRANSFERIR A DONATIO:</span>
                     <span>Bs. {{ number_format($totalSaasFeeBob, 2) }}</span>
                 </div>
             </div>
@@ -287,7 +287,7 @@
 
         <div class="payment-instructions">
             <h4>🏦 Instrucciones para Transferencia Bancaria</h4>
-            <p>Favor realizar la transferencia de la comisión del 2% a la siguiente cuenta bancaria:</p>
+            <p>Favor realizar la transferencia de la Comisión SaaS facturada a la siguiente cuenta bancaria:</p>
             <p><strong>Banco:</strong> Banco Mercantil Santa Cruz / BCP</p>
             <p><strong>Titular:</strong> Donatio SaaS Bolivia (Empresa Unipersonal)</p>
             <p><strong>Número de Cuenta:</strong> 4010-894726-01-2 (Cta. Corriente en Bolivianos)</p>

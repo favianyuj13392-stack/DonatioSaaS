@@ -3,6 +3,7 @@
 namespace App\Filament\Widgets;
 
 use App\Models\Foundation;
+use App\Services\ExchangeRate\ExchangeRateService;
 use Filament\Widgets\ChartWidget;
 
 class TopFoundationsChart extends ChartWidget
@@ -14,10 +15,17 @@ class TopFoundationsChart extends ChartWidget
     protected function getData(): array
     {
         $currentMonth = now()->startOfMonth();
-        $exchangeRate = (float) config('donatio.usd_exchange_rate', 6.96);
+        $rateService = app(ExchangeRateService::class);
+        $latestRate = $rateService->getLatestConfirmedRate('USD/BOB');
+        $exchangeRate = $latestRate ? (float) $latestRate->sell_rate : $rateService->getCurrentSellRate('USD/BOB');
 
         $foundations = Foundation::with(['donations' => function ($q) use ($currentMonth) {
-            $q->where('status', 'completed')->where('paid_at', '>=', $currentMonth);
+            $q->withoutGlobalScopes()
+              ->where('status', 'completed')
+              ->where(function ($sub) use ($currentMonth) {
+                  $sub->where('paid_at', '>=', $currentMonth)
+                      ->orWhere('created_at', '>=', $currentMonth);
+              });
         }])->get();
 
         $ranked = $foundations->map(function ($f) use ($exchangeRate) {
@@ -35,7 +43,7 @@ class TopFoundationsChart extends ChartWidget
             'datasets' => [
                 [
                     'label'           => 'Total Recaudado (BOB)',
-                    'data'            => $ranked->pluck('gmv')->toArray(),
+                    'data'            => $ranked->pluck('gmv')->values()->toArray(),
                     'backgroundColor' => [
                         '#db2777',
                         '#2563eb',
@@ -45,7 +53,7 @@ class TopFoundationsChart extends ChartWidget
                     ],
                 ],
             ],
-            'labels'   => $ranked->pluck('name')->toArray(),
+            'labels'   => $ranked->pluck('name')->values()->toArray(),
         ];
     }
 

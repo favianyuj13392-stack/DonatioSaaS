@@ -3,6 +3,7 @@
 namespace App\Filament\Widgets;
 
 use App\Models\Donation;
+use App\Services\ExchangeRate\ExchangeRateService;
 use Carbon\Carbon;
 use Filament\Widgets\ChartWidget;
 
@@ -18,18 +19,25 @@ class DailyRevenueChart extends ChartWidget
             return now()->subDays($dayOffset)->format('Y-m-d');
         });
 
-        $donations = Donation::where('status', 'completed')
-            ->where('paid_at', '>=', now()->subDays(30)->startOfDay())
+        $donations = Donation::withoutGlobalScopes()
+            ->where('status', 'completed')
+            ->where(function ($q) {
+                $q->where('paid_at', '>=', now()->subDays(30)->startOfDay())
+                  ->orWhere('created_at', '>=', now()->subDays(30)->startOfDay());
+            })
             ->get();
 
-        $exchangeRate = (float) config('donatio.usd_exchange_rate', 6.96);
+        $rateService = app(ExchangeRateService::class);
+        $latestRate = $rateService->getLatestConfirmedRate('USD/BOB');
+        $exchangeRate = $latestRate ? (float) $latestRate->sell_rate : $rateService->getCurrentSellRate('USD/BOB');
 
         $dailyGmv = [];
         $dailySaasFee = [];
 
         foreach ($days as $day) {
             $dayDonations = $donations->filter(function ($donation) use ($day) {
-                return Carbon::parse($donation->paid_at)->format('Y-m-d') === $day;
+                $date = $donation->paid_at ? Carbon::parse($donation->paid_at)->format('Y-m-d') : Carbon::parse($donation->created_at)->format('Y-m-d');
+                return $date === $day;
             });
 
             $gmv = $dayDonations->sum(function ($d) use ($exchangeRate) {
@@ -54,7 +62,7 @@ class DailyRevenueChart extends ChartWidget
                     'fill'            => true,
                 ],
                 [
-                    'label'           => 'Tu Comisión 2% SaaS (BOB)',
+                    'label'           => 'Comisión SaaS (BOB)',
                     'data'            => $dailySaasFee,
                     'borderColor'     => '#db2777',
                     'backgroundColor' => 'rgba(219, 39, 119, 0.2)',

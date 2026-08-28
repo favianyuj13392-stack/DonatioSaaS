@@ -49,8 +49,9 @@ class DonationResource extends Resource
                     ->sortable(),
 
                 Tables\Columns\TextColumn::make('saas_fee_amount')
-                    ->label('Tu 2% (SaaS)')
+                    ->label('Comisión SaaS')
                     ->state(fn (Donation $record): string => "{$record->currency} " . number_format((float) $record->saas_fee_amount, 2))
+                    ->description(fn (Donation $record): string => ($record->payment_method === 'card' ? ($record->foundation->saas_fee_card ?? '2.00') : ($record->foundation->saas_fee_qr ?? '1.50')) . '% aplicado')
                     ->color('success')
                     ->sortable(),
 

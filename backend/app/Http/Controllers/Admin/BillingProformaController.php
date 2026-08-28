@@ -18,11 +18,14 @@ class BillingProformaController extends Controller
     public function show(Request $request, string $period, int $foundationId): View
     {
         $foundation = Foundation::findOrFail($foundationId);
-        $exchangeRate = (float) config('donatio.usd_exchange_rate', 6.96);
-
         $periodDate = Carbon::createFromFormat('Y-m', $period);
         $periodName = $periodDate->locale('es')->isoFormat('MMMM YYYY');
         $proformaNumber = 'PRF-' . $periodDate->format('Ym') . '-' . ($foundation->code ?: 'TENANT' . $foundation->id);
+
+        $rateService = app(\App\Services\ExchangeRate\ExchangeRateService::class);
+        $periodEndDate = $periodDate->copy()->endOfMonth()->toDateString();
+        $confirmedRate = $rateService->getConfirmedRateForDate($periodEndDate, 'USD/BOB') ?: $rateService->getLatestConfirmedRate('USD/BOB');
+        $exchangeRate = $confirmedRate ? (float) $confirmedRate->sell_rate : $rateService->getCurrentSellRate('USD/BOB');
 
         $donations = Donation::withoutGlobalScopes()
             ->where('foundation_id', $foundation->id)

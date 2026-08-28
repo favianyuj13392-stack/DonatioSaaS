@@ -30,6 +30,13 @@ class SubscriptionResource extends Resource
                     ->sortable()
                     ->weight('bold'),
 
+                Tables\Columns\TextColumn::make('foundation.name')
+                    ->label('Fundación')
+                    ->badge()
+                    ->color('primary')
+                    ->searchable()
+                    ->sortable(),
+
                 Tables\Columns\TextColumn::make('donor.email')
                     ->label('Email')
                     ->searchable()
@@ -85,6 +92,10 @@ class SubscriptionResource extends Resource
                     }),
             ])
             ->filters([
+                Tables\Filters\SelectFilter::make('foundation_id')
+                    ->label('Filtrar por Fundación')
+                    ->relationship('foundation', 'name'),
+
                 Tables\Filters\SelectFilter::make('status')
                     ->label('Filtrar por Estado')
                     ->options([

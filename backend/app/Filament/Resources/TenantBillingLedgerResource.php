@@ -9,16 +9,35 @@ use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
 
 class TenantBillingLedgerResource extends Resource
 {
     protected static ?string $model = TenantBillingLedger::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-calculator';
-    protected static ?string $navigationLabel = 'Facturación & Liquidación';
-    protected static ?string $modelLabel = 'Liquidación SaaS';
+    protected static ?string $navigationLabel = 'Facturación & Liquidaciones';
+    protected static ?string $modelLabel = 'Liquidación Consolidada';
     protected static ?string $pluralModelLabel = 'Facturación & Liquidaciones';
     protected static ?int $navigationSort = 4;
+
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()
+            ->select([
+                'billing_period',
+                'foundation_id',
+                DB::raw('MIN(id) as id'),
+                DB::raw('COUNT(*) as total_donations_count'),
+                DB::raw('SUM(gross_amount) as total_gross_amount'),
+                DB::raw('SUM(saas_fee_amount) as total_saas_fee_amount'),
+                DB::raw("CASE WHEN COUNT(CASE WHEN status != 'paid' THEN 1 END) = 0 THEN 'paid' ELSE 'pending' END as consolidated_status"),
+                DB::raw('MAX(paid_at) as latest_paid_at'),
+                DB::raw('MAX(created_at) as created_at'),
+            ])
+            ->groupBy('billing_period', 'foundation_id');
+    }
 
     public static function table(Table $table): Table
     {
@@ -28,89 +47,63 @@ class TenantBillingLedgerResource extends Resource
                     ->label('Período')
                     ->badge()
                     ->color('info')
-                    ->sortable(),
+                    ->sortable()
+                    ->searchable(),
 
                 Tables\Columns\TextColumn::make('foundation.name')
-                    ->label('Fundación')
+                    ->label('Fundación / Tenant')
                     ->badge()
                     ->color('primary')
                     ->searchable()
                     ->sortable(),
 
-                Tables\Columns\TextColumn::make('donation.merchant_reference_number')
-                    ->label('Ref. Transacción')
-                    ->searchable()
-                    ->copyable()
-                    ->placeholder('N/A'),
+                Tables\Columns\TextColumn::make('total_donations_count')
+                    ->label('Transacciones')
+                    ->badge()
+                    ->color('gray')
+                    ->formatStateUsing(fn ($state) => "{$state} donaciones")
+                    ->alignCenter(),
 
-                Tables\Columns\TextColumn::make('gross_amount')
-                    ->label('Monto Donado')
+                Tables\Columns\TextColumn::make('total_gross_amount')
+                    ->label('GMV Recaudado')
                     ->money('BOB')
-                    ->sortable(),
-
-                Tables\Columns\TextColumn::make('saas_fee_percentage')
-                    ->label('Tasa SaaS')
-                    ->suffix('%')
+                    ->sortable()
                     ->alignRight(),
 
-                Tables\Columns\TextColumn::make('saas_fee_amount')
-                    ->label('Comisión SaaS')
+                Tables\Columns\TextColumn::make('total_saas_fee_amount')
+                    ->label('Comisión SaaS a Facturar')
                     ->money('BOB')
                     ->weight('bold')
                     ->color('success')
                     ->sortable()
                     ->alignRight(),
 
-                Tables\Columns\TextColumn::make('status')
-                    ->label('Estado')
+                Tables\Columns\TextColumn::make('consolidated_status')
+                    ->label('Estado de Facturación')
                     ->badge()
                     ->color(fn (string $state): string => match ($state) {
-                        'pending'  => 'warning',
-                        'invoiced' => 'info',
-                        'paid'     => 'success',
-                        default    => 'gray',
+                        'pending' => 'warning',
+                        'paid'    => 'success',
+                        default   => 'gray',
                     })
                     ->formatStateUsing(fn (string $state): string => match ($state) {
-                        'pending'  => 'Pendiente de Cobro',
-                        'invoiced' => 'Facturado',
-                        'paid'     => 'Cobrado / Liquidado',
-                        default    => $state,
+                        'pending' => '⏳ Pendiente de Cobro',
+                        'paid'    => '✓ Cobrado y Liquidado',
+                        default   => $state,
                     }),
 
-                Tables\Columns\TextColumn::make('payment_reference')
-                    ->label('Ref. Transferencia')
-                    ->placeholder('Sin registro')
-                    ->copyable()
-                    ->toggleable(),
-
-                Tables\Columns\TextColumn::make('paid_at')
-                    ->label('Fecha Cobro')
+                Tables\Columns\TextColumn::make('latest_paid_at')
+                    ->label('Fecha de Cobro')
                     ->dateTime('d/m/Y H:i')
                     ->placeholder('Pendiente')
                     ->sortable()
                     ->toggleable(),
-
-                Tables\Columns\TextColumn::make('created_at')
-                    ->label('Fecha Generación')
-                    ->dateTime('d/m/Y H:i')
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
             ])
-            ->defaultSort('created_at', 'desc')
+            ->defaultSort('billing_period', 'desc')
             ->filters([
                 Tables\Filters\SelectFilter::make('foundation_id')
                     ->label('Filtrar por Fundación')
                     ->relationship('foundation', 'name'),
-
-                Tables\Filters\SelectFilter::make('billing_period')
-                    ->label('Período de Facturación'),
-
-                Tables\Filters\SelectFilter::make('status')
-                    ->options([
-                        'pending'  => 'Pendiente',
-                        'invoiced' => 'Facturado',
-                        'paid'     => 'Liquidado',
-                    ]),
             ])
             ->actions([
                 // Ver y Descargar Proforma PDF de Liquidación
@@ -124,12 +117,12 @@ class TenantBillingLedgerResource extends Resource
                     ]))
                     ->openUrlInNewTab(),
 
-                // Modal de Registro de Pago de Comisión
+                // Modal de Registro de Cobro Consolidado del Mes
                 Tables\Actions\Action::make('mark_paid')
                     ->label('Registrar Cobro')
                     ->icon('heroicon-o-check-circle')
                     ->color('success')
-                    ->visible(fn (TenantBillingLedger $record) => $record->status !== 'paid')
+                    ->visible(fn (TenantBillingLedger $record) => $record->consolidated_status !== 'paid')
                     ->form([
                         Forms\Components\TextInput::make('payment_reference')
                             ->label('Número de Transferencia / Transacción Bancaria')
@@ -142,20 +135,22 @@ class TenantBillingLedgerResource extends Resource
                             ->required(),
 
                         Forms\Components\Textarea::make('notes')
-                            ->label('Notas / Observaciones')
+                            ->label('Notas / Factura SIAT Emitida')
                             ->placeholder('Factura emitida Nro #1024'),
                     ])
                     ->action(function (TenantBillingLedger $record, array $data): void {
-                        $record->update([
-                            'status'            => 'paid',
-                            'payment_reference' => $data['payment_reference'],
-                            'paid_at'           => $data['paid_at'],
-                            'notes'             => $data['notes'] ?? null,
-                        ]);
+                        TenantBillingLedger::where('foundation_id', $record->foundation_id)
+                            ->where('billing_period', $record->billing_period)
+                            ->update([
+                                'status'            => 'paid',
+                                'payment_reference' => $data['payment_reference'],
+                                'paid_at'           => $data['paid_at'],
+                                'notes'             => $data['notes'] ?? null,
+                            ]);
 
                         Notification::make()
-                            ->title('✓ Cobro Registrado Exitosamente')
-                            ->body("La comisión de Bs. {$record->saas_fee_amount} ha sido marcada como liquidada.")
+                            ->title('✓ Liquidación Mensual Cobrada')
+                            ->body("Se marcó como cobrado el período {$record->billing_period} de {$record->foundation->name}.")
                             ->success()
                             ->send();
                     }),
