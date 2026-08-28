@@ -39,6 +39,7 @@ services:
     restart: unless-stopped
     networks:
       - proxy
+      - donatio_net
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=proxy"
