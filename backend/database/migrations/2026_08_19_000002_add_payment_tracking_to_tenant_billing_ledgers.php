@@ -12,9 +12,15 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('tenant_billing_ledgers', function (Blueprint $table) {
-            $table->string('payment_reference')->nullable()->after('status');
-            $table->timestamp('paid_at')->nullable()->after('payment_reference');
-            $table->text('notes')->nullable()->after('paid_at');
+            if (!Schema::hasColumn('tenant_billing_ledgers', 'payment_reference')) {
+                $table->string('payment_reference')->nullable()->after('status');
+            }
+            if (!Schema::hasColumn('tenant_billing_ledgers', 'paid_at')) {
+                $table->timestamp('paid_at')->nullable()->after('payment_reference');
+            }
+            if (!Schema::hasColumn('tenant_billing_ledgers', 'notes')) {
+                $table->text('notes')->nullable()->after('paid_at');
+            }
         });
     }
 
