@@ -21,7 +21,7 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=proxy"
-      - "traefik.http.routers.donatio-api.rule=Host(`api-donatio.darkosyn.com`)"
+      - "traefik.http.routers.donatio-api.rule=Host(`api-donatio.darkosync.com`)"
       - "traefik.http.routers.donatio-api.entrypoints=websecure"
       - "traefik.http.routers.donatio-api.tls=true"
       - "traefik.http.routers.donatio-api.tls.certresolver=letsencrypt"
@@ -42,7 +42,7 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=proxy"
-      - "traefik.http.routers.donatio-frontend.rule=Host(`donatio.darkosyn.com`)"
+      - "traefik.http.routers.donatio-frontend.rule=Host(`donatio.darkosync.com`)"
       - "traefik.http.routers.donatio-frontend.entrypoints=websecure"
       - "traefik.http.routers.donatio-frontend.tls=true"
       - "traefik.http.routers.donatio-frontend.tls.certresolver=letsencrypt"
