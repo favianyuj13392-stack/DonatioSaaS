@@ -8,15 +8,11 @@ RUN install-php-extensions pdo_pgsql pgsql redis bcmath intl zip gd pcntl
 
 WORKDIR /app
 
-# Copiar dependencias de Composer e instalarlas
-COPY composer.json composer.lock ./
-RUN composer install --no-dev --no-interaction --no-plugins --no-scripts --prefer-dist
-
-# Copiar el código fuente del backend
+# Copiar el código fuente completo del backend
 COPY . .
 
-# Generar autoloader optimizado para producción
-RUN composer dump-autoload --optimize --no-dev
+# Instalar dependencias de producción y sincronizar autoloader
+RUN composer update --no-dev --no-interaction --prefer-dist --optimize-autoloader
 
 # Permisos para storage y bootstrap cache
 RUN mkdir -p /app/storage/framework/cache /app/storage/framework/sessions /app/storage/framework/views /app/bootstrap/cache \
