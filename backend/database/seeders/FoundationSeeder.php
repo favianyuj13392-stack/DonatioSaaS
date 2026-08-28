@@ -4,8 +4,8 @@ namespace Database\Seeders;
 
 use App\Models\Campaign;
 use App\Models\Foundation;
+use App\Models\User;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\Hash;
 
 class FoundationSeeder extends Seeder
 {
@@ -54,17 +54,15 @@ class FoundationSeeder extends Seeder
                         'website_url' => 'https://www.bago.com.bo',
                     ],
                 ],
-                'atc_merchant_id'       => 'redenlace_000021',
-                'atc_api_key_id'        => '3ada8327-76bd-4ed9-9952-0e8288f6e212',
-                'atc_secret_key'        => '/zFZFhYflXW/P3BMzkULTcIuJhdcXCVD9SKJEo+fJXo=',
+                // Credenciales ATC Enlace Sandbox (Cifrado automático AES-256 en Foundation Model)
+                'atc_merchant_id'       => 'test_merchant_esperanza',
+                'atc_api_key_id'        => 'test_key_esperanza_123',
+                'atc_secret_key'        => 'test_secret_esperanza_456',
                 'atc_org_unit_id'       => 'org_unit_test_123',
                 'is_sandbox'            => true,
                 'status'                => 'active',
             ]
         );
-
-        // Bind temporal para que el trait BelongsToTenant auto-asigne el tenant
-        app()->instance('current_tenant', $foundation);
 
         // 2. Campaña Principal: Navidad con Esperanza 2026
         Campaign::updateOrCreate(
@@ -73,50 +71,48 @@ class FoundationSeeder extends Seeder
                 'title'                  => 'Navidad con Esperanza 2026',
                 'headline'               => 'Que ningún niño abandone su tratamiento por falta de recursos.',
                 'description'            => 'Ayudamos a 50 niños con cáncer y a sus familias a permanecer en La Paz durante su tratamiento oncológico integral.',
-                'story_markdown'         => "Cada semana, mamás y papás viajan más de 14 horas desde comunidades rurales de Bolivia con sus hijos en brazos. Al llegar al hospital oncológico, se enfrentan a un diagnóstico devastador y a la dura realidad de no tener recursos para costear las ampollas de quimioterapia ni un lugar donde pasar la noche.\n\nEl mayor riesgo no es la enfermedad: es el abandono del tratamiento por falta de dinero.\n\nCon tu donación, garantizamos que cada niño permanezca en nuestro albergue con nutrición completa y medicación continua hasta tocar la campana de la victoria.",
-                'story_image_url'        => 'https://images.unsplash.com/photo-1576765608535-5f04d1e3f289?auto=format&fit=crop&w=800&q=80',
+                'story_markdown'         => "La Fundación Nuestra Esperanza nació con la misión de evitar que los niños diagnosticados con cáncer en el área rural de Bolivia deban abandonar su tratamiento médico en el Hospital del Niño de La Paz por carecer de hospedaje, medicinas o alimentación adecuada.\n\nEn estos **8 años de labor ininterrumpida**, hemos canalizado cirugías complejas, quimioterapias y albergue integral a más de **450 familias bolivianas**.\n\nCon tu donación, estás financiando directamente insumos médicos, laboratorios especializados y la manutención mensual de una cama en nuestro albergue solidario.",
                 'banner_url'             => 'https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?auto=format&fit=crop&w=1200&q=80',
                 'monetary_goal'          => 50000.00,
                 'current_amount'         => 12980.00,
                 'allowed_frequencies'    => 'all',
                 'allowed_payment_methods'=> 'all',
-                'monthly_label'          => 'Cada mes (Padrino)',
-                'single_label'           => 'Una sola vez',
                 'donation_tiers'         => [
-                    ['amount' => 30, 'label' => 'Alimentación de 1 día (niño + mamá)', 'is_default' => false],
-                    ['amount' => 50, 'label' => '1 Kit de medicamentos esenciales', 'is_default' => true],
-                    ['amount' => 100, 'label' => '3 Días de albergue y atención médica integral', 'is_default' => false],
-                    ['amount' => 250, 'label' => 'Tratamiento semanal y análisis de laboratorio', 'is_default' => false],
+                    ['amount' => 50, 'label' => 'Medicamento Básico: Cubre analgésicos e insumos de curación', 'is_default' => false],
+                    ['amount' => 100, 'label' => 'Albergue y Nutrición: 3 días de estadía y alimentación para madre y niño', 'is_default' => true],
+                    ['amount' => 250, 'label' => 'Laboratorio Oncológico: Paquete completo de estudios hematológicos', 'is_default' => false],
+                    ['amount' => 500, 'label' => 'Ciclo de Quimioterapia: Aporte sustancial para sesión médica', 'is_default' => false],
                 ],
                 'tangible_impact_items'  => [
                     [
-                        'icon'           => 'utensils',
-                        'title'          => 'Alimentación',
-                        'description'    => 'Cubre 3 comidas nutritivas y merienda para el niño y su acompañante en el albergue.',
-                        'stat_highlight' => 'Bs. 30',
+                        'icon'           => 'bed',
+                        'title'          => 'Albergue Solidario',
+                        'description'    => 'Garantiza cama caliente y 3 comidas diarias para el paciente y su acompañante durante semanas de tratamiento.',
+                        'stat_highlight' => 'Bs. 100',
                     ],
                     [
                         'icon'           => 'pill',
-                        'title'          => 'Medicamentos',
-                        'description'    => 'Ampollas de quimioterapia básica, analgésicos y sueros de hidratación hospitalaria.',
+                        'title'          => 'Medicamentos Oncológicos',
+                        'description'    => 'Fármacos coadyuvantes para contrarrestar efectos secundarios y proteger el sistema inmunológico.',
                         'stat_highlight' => 'Bs. 50',
                     ],
                     [
-                        'icon'           => 'home',
-                        'title'          => 'Albergue y Atención',
-                        'description'    => 'Hospedaje seguro, cama limpia, agua caliente y asistencia social integral.',
-                        'stat_highlight' => 'Bs. 100',
+                        'icon'           => 'heart',
+                        'title'          => 'Apoyo Emocional y Nutricional',
+                        'description'    => 'Acompañamiento psicológico infantil y soporte nutricional especializado.',
+                        'stat_highlight' => 'Bs. 250',
+                    ],
+                    [
+                        'icon'           => 'sparkles',
+                        'title'          => 'Tú Eliges Cuánto Ayudar',
+                        'description'    => 'Cualquier monto marca la diferencia inmediata en el tratamiento de un niño.',
+                        'stat_highlight' => 'Otro monto',
                     ],
                 ],
-                'funds_breakdown'        => [
-                    ['title' => 'Tratamiento Médico', 'percentage' => 70, 'description' => 'Compra directa de fármacos oncológicos y análisis clínicos.', 'color' => '#db2777'],
-                    ['title' => 'Albergue y Nutrición', 'percentage' => 20, 'description' => 'Hospedaje digno, agua caliente y 3 comidas diarias.', 'color' => '#4f46e5'],
-                    ['title' => 'Traslados y Logística', 'percentage' => 10, 'description' => 'Pasajes y logística para familias de zonas rurales.', 'color' => '#94a3b8'],
-                ],
                 'testimonial'            => [
-                    'quote'        => 'Cuando nos diagnosticaron a Mateo en Potosí, no teníamos ni para el pasaje. Gracias a los padrinos y al albergue, mi hijo pudo completar sus quimioterapias y hoy está sano.',
-                    'author_name'  => 'Rosa Flores',
-                    'author_role'  => 'Madre de Mateo (6 años)',
+                    'quote'        => 'Cuando llegamos desde Potosí no teníamos dónde dormir ni para las medicinas de Matías. La Fundación no solo nos dio un techo, nos dio la esperanza de que mi hijo hoy esté sano.',
+                    'author_name'  => 'María Choque',
+                    'author_role'  => 'Mamá de Matías (Paciente recuperado)',
                     'location'     => 'Caso Real · La Paz, Bolivia',
                     'image_url'    => 'https://images.unsplash.com/photo-1576765608535-5f04d1e3f289?auto=format&fit=crop&w=400&q=80',
                 ],
@@ -169,14 +165,14 @@ class FoundationSeeder extends Seeder
             ]
         );
 
-        // 4. Usuario Administrador para Filament CMS
-        \App\Models\User::updateOrCreate(
+        // 4. Usuario SuperAdmin Global
+        User::updateOrCreate(
             ['email' => 'admin@donatio.lat'],
             [
-                'name'          => 'Administrador Donatio',
-                'password'      => Hash::make('password'),
-                'foundation_id' => $foundation->id,
-                'role'          => 'tenant_admin',
+                'name'          => 'Superadmin Donatio',
+                'password'      => 'password', // Hasheado automáticamente por Eloquent cast
+                'foundation_id' => null,
+                'role'          => 'superadmin',
             ]
         );
     }
