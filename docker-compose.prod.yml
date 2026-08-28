@@ -43,7 +43,7 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=proxy"
-      - "traefik.http.routers.donatio-frontend.rule=Host(`donatio.darkosync.com`)"
+      - "traefik.http.routers.donatio-frontend.rule=Host(`donatio.darkosync.com`) || Host(`esperanza.darkosync.com`) || Host(`vfuturo.darkosync.com`) || Host(`fundacionesperanza.darkosync.com`) || HostRegexp(`{subdomain:[a-z0-9-]+}.darkosync.com`)"
       - "traefik.http.routers.donatio-frontend.entrypoints=websecure"
       - "traefik.http.routers.donatio-frontend.tls=true"
       - "traefik.http.routers.donatio-frontend.tls.certresolver=letsencrypt"
