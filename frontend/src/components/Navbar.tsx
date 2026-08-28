@@ -1,10 +1,28 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTenant } from '../context/TenantContext';
 import { ShieldCheck, Menu, X, Heart } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
   const { tenant, campaign, routeMode, navigateToHome, navigateToCampaigns } = useTenant();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  useEffect(() => {
+    if (!mobileMenuOpen) return;
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMobileMenuOpen(false);
+    };
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [mobileMenuOpen]);
+
+  useEffect(() => {
+    if (mobileMenuOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => { document.body.style.overflow = ''; };
+  }, [mobileMenuOpen]);
 
   if (!tenant) return null;
 
@@ -60,7 +78,7 @@ export const Navbar: React.FC = () => {
           </button>
 
           {/* Menú de Navegación Desktop */}
-          <nav className="hidden md:flex items-center gap-6 text-xs sm:text-sm font-bold text-slate-600">
+          <nav className="hidden lg:flex items-center gap-6 text-xs sm:text-sm font-bold text-slate-600">
             <button
               type="button"
               onClick={navigateToHome}
@@ -127,7 +145,7 @@ export const Navbar: React.FC = () => {
           </nav>
 
           {/* Botón Donar Ahora Desktop */}
-          <div className="hidden sm:flex items-center gap-3">
+          <div className="hidden lg:flex items-center gap-3">
             <button
               type="button"
               onClick={scrollToDonate}
@@ -139,7 +157,7 @@ export const Navbar: React.FC = () => {
           </div>
 
           {/* Botón Menú Mobile */}
-          <div className="flex md:hidden items-center gap-2">
+          <div className="flex lg:hidden items-center gap-2">
             <button
               type="button"
               onClick={scrollToDonate}
@@ -151,7 +169,9 @@ export const Navbar: React.FC = () => {
               type="button"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className="p-2 text-slate-600 hover:text-slate-900 rounded-lg"
-              aria-label="Abrir menú"
+              aria-label={mobileMenuOpen ? 'Cerrar menú' : 'Abrir menú'}
+              aria-expanded={mobileMenuOpen}
+              aria-controls="mobile-nav-menu"
             >
               {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </button>
@@ -162,11 +182,11 @@ export const Navbar: React.FC = () => {
 
       {/* Menú Desplegable Mobile */}
       {mobileMenuOpen && (
-        <div className="md:hidden bg-white border-b border-slate-200 px-4 pt-3 pb-5 space-y-3">
+        <div id="mobile-nav-menu" role="navigation" aria-label="Navegación móvil" className="md:hidden bg-white border-b border-slate-200 px-4 pt-3 pb-5 space-y-3">
           <button
             type="button"
             onClick={() => { setMobileMenuOpen(false); navigateToHome(); }}
-            className="block w-full text-left py-2 text-sm font-bold text-slate-700"
+            className="block w-full text-left py-3 text-sm font-bold text-slate-700"
           >
             Inicio
           </button>
@@ -174,7 +194,7 @@ export const Navbar: React.FC = () => {
             <button
               type="button"
               onClick={() => scrollToSection('quienes-somos')}
-              className="block w-full text-left py-2 text-sm font-bold text-slate-700"
+              className="block w-full text-left py-3 text-sm font-bold text-slate-700"
             >
               Quiénes somos
             </button>
@@ -183,7 +203,7 @@ export const Navbar: React.FC = () => {
             <button
               type="button"
               onClick={() => scrollToSection('programas')}
-              className="block w-full text-left py-2 text-sm font-bold text-slate-700"
+              className="block w-full text-left py-3 text-sm font-bold text-slate-700"
             >
               Qué hacemos
             </button>
@@ -192,7 +212,7 @@ export const Navbar: React.FC = () => {
             <button
               type="button"
               onClick={() => scrollToSection('impacto')}
-              className="block w-full text-left py-2 text-sm font-bold text-slate-700"
+              className="block w-full text-left py-3 text-sm font-bold text-slate-700"
             >
               Impacto
             </button>
@@ -201,7 +221,7 @@ export const Navbar: React.FC = () => {
             <button
               type="button"
               onClick={() => scrollToSection('transparencia')}
-              className="block w-full text-left py-2 text-sm font-bold text-slate-700"
+              className="block w-full text-left py-3 text-sm font-bold text-slate-700"
             >
               Transparencia
             </button>
@@ -209,14 +229,14 @@ export const Navbar: React.FC = () => {
           <button
             type="button"
             onClick={() => { setMobileMenuOpen(false); navigateToCampaigns(); }}
-            className="block w-full text-left py-2 text-sm font-bold text-slate-700"
+            className="block w-full text-left py-3 text-sm font-bold text-slate-700"
           >
             Campañas
           </button>
           <button
             type="button"
             onClick={() => scrollToSection('contacto')}
-            className="block w-full text-left py-2 text-sm font-bold text-slate-700"
+            className="block w-full text-left py-3 text-sm font-bold text-slate-700"
           >
             Contacto
           </button>

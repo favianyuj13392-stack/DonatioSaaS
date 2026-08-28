@@ -1,6 +1,7 @@
 import React from 'react';
 import { Heart, Download, X, Share2, CheckCircle2 } from 'lucide-react';
 import { Tenant } from '../types';
+import { useTenant } from '../context/TenantContext';
 
 interface DonationSuccessModalProps {
   tenant: Tenant;
@@ -9,6 +10,7 @@ interface DonationSuccessModalProps {
   frequency: 'single' | 'monthly';
   referenceNumber?: string;
   receiptUrl?: string | null;
+  campaignTitle?: string;
   onClose: () => void;
 }
 
@@ -19,10 +21,15 @@ export const DonationSuccessModal: React.FC<DonationSuccessModalProps> = ({
   frequency,
   referenceNumber,
   receiptUrl,
+  campaignTitle,
   onClose,
 }) => {
+  const { campaign } = useTenant();
+  const effectiveCampaignTitle = campaignTitle || campaign?.title;
+  const tenantName = tenant?.name || 'la organización';
+  const campaignSuffix = effectiveCampaignTitle ? ` en la campaña "${effectiveCampaignTitle}"` : '';
   const shareText = encodeURIComponent(
-    `Acabo de donar Bs. ${amount} para apoyar el tratamiento de niños con cáncer en Bolivia a través de la Fundación ${tenant.name}. ¡Tú también puedes sumarte!`
+    `Acabo de donar a ${tenantName}${campaignSuffix} a través de Donatio. ¡Vos también podés ayudar!`
   );
   const whatsappShareUrl = `https://wa.me/?text=${shareText}`;
 
@@ -51,11 +58,11 @@ export const DonationSuccessModal: React.FC<DonationSuccessModalProps> = ({
 
         {/* Titular Emocional */}
         <h3 className="text-2xl sm:text-3xl font-black text-slate-900 mb-2 tracking-tight">
-          ¡Gracias por ser la esperanza de un niño!
+          ¡Gracias por tu apoyo y generosidad!
         </h3>
 
         <p className="text-xs sm:text-sm text-slate-600 mb-6 leading-relaxed">
-          Tu aporte de <strong>Bs. {amount.toLocaleString('es-BO', { minimumFractionDigits: 2 })}</strong> a <strong>{tenant.name}</strong> ya está haciendo posible que medicamentos y albergue lleguen a quienes más lo necesitan.
+          Tu aporte de <strong>Bs. {amount.toLocaleString('es-BO', { minimumFractionDigits: 2 })}</strong> a <strong>{tenant.name}</strong> ya está haciendo posible continuar con nuestra labor solidaria.
         </p>
 
         {/* Resumen Limpio del Aporte */}
