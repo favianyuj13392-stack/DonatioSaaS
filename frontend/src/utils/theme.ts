@@ -32,8 +32,8 @@ export function getRelativeLuminance(r: number, g: number, b: number): number {
 export function getAccessibleTextColor(hex: string): string {
   const [r, g, b] = hexToRgb(hex);
   const luminance = getRelativeLuminance(r, g, b);
-  // Un luminance > 0.4 indica color claro que requiere texto oscuro para cumplir AA
-  return luminance > 0.4 ? '#0f172a' : '#ffffff';
+  // Un luminance > 0.179 indica color claro que requiere texto oscuro para cumplir AA
+  return luminance > 0.179 ? '#0f172a' : '#ffffff';
 }
 
 /**
