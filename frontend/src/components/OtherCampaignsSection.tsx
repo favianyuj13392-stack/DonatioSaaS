@@ -1,9 +1,11 @@
 import React from 'react';
 import { useTenant } from '../context/TenantContext';
 import { Sparkles, ArrowRight, Heart } from 'lucide-react';
+import { useScrollAnimation } from '../hooks/useScrollAnimation';
 
 export const OtherCampaignsSection: React.FC = () => {
   const { otherCampaigns, tenant, navigateToCampaign, navigateToCampaigns } = useTenant();
+  const { ref, isVisible } = useScrollAnimation();
 
   if (!otherCampaigns || otherCampaigns.length === 0) {
     return null;
@@ -15,7 +17,11 @@ export const OtherCampaignsSection: React.FC = () => {
   const hasMore = otherCampaigns.length >= 3;
 
   return (
-    <section id="campanas" className="py-16 sm:py-24 bg-slate-50/60 border-t border-slate-200/60">
+    <section 
+      ref={ref as React.RefObject<HTMLElement>}
+      id="campanas" 
+      className={`py-16 sm:py-24 bg-slate-50/60 border-t border-slate-200/60 transition-all duration-700 ease-out ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}
+    >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
         
         {/* Encabezado */}
@@ -65,11 +71,11 @@ export const OtherCampaignsSection: React.FC = () => {
 
                 <div className="p-6 sm:p-7 space-y-4 flex-1 flex flex-col justify-between">
                   <div className="space-y-2">
-                    <h3 className="text-lg font-black text-slate-900 line-clamp-2 leading-snug group-hover:text-[var(--tenant-primary)] transition">
+                    <h3 className="text-lg font-extrabold text-slate-900 line-clamp-2 leading-snug group-hover:text-[var(--tenant-primary)] transition">
                       {c.title}
                     </h3>
                     <p className="text-xs sm:text-sm text-slate-600 line-clamp-3 leading-relaxed">
-                      {c.description || 'Apoya esta iniciativa solidaria para seguir transformando vidas en Bolivia.'}
+                      {c.description || 'Apoya esta iniciativa solidaria para seguir transformando vidas.'}
                     </p>
                   </div>
 
@@ -83,7 +89,14 @@ export const OtherCampaignsSection: React.FC = () => {
                           Meta: Bs. {c.monetary_goal.toLocaleString('es-BO', { minimumFractionDigits: 2 })}
                         </span>
                       </div>
-                      <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
+                      <div 
+                        className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden"
+                        role="progressbar"
+                        aria-valuenow={pct}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-label="Progreso de recaudación"
+                      >
                         <div
                           className="h-full rounded-full transition-all duration-700 progress-bar-tenant"
                           style={{ width: `${pct}%` }}
@@ -118,7 +131,7 @@ export const OtherCampaignsSection: React.FC = () => {
             <button
               type="button"
               onClick={navigateToCampaigns}
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl text-sm font-black border-2 border-slate-200 bg-white hover:bg-slate-50 text-slate-800 hover:border-slate-300 shadow-2xs transition"
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl text-sm font-bold border-2 border-slate-200 bg-white hover:bg-slate-50 text-slate-800 hover:border-slate-300 shadow-2xs transition"
             >
               <span>Ver todas las campañas activas</span>
               <ArrowRight className="w-4 h-4 text-[var(--tenant-primary)]" />

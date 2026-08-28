@@ -59,7 +59,14 @@ export const CampaignsListPage: React.FC = () => {
                       <span className="text-slate-500">Recaudado</span>
                       <span className="text-slate-900">Bs. {c.current_amount.toLocaleString('es-BO')}</span>
                     </div>
-                    <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                    <div 
+                      className="w-full bg-slate-100 h-2 rounded-full overflow-hidden"
+                      role="progressbar"
+                      aria-valuenow={pct}
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      aria-label="Progreso de recaudación"
+                    >
                       <div
                         className="h-full rounded-full progress-bar-tenant"
                         style={{ width: `${pct}%` }}

@@ -1,18 +1,25 @@
 import React from 'react';
 import { CorporatePartner } from '../types';
 import { Building2 } from 'lucide-react';
+import { useScrollAnimation } from '../hooks/useScrollAnimation';
 
 interface CorporatePartnersMarqueeProps {
   partners?: CorporatePartner[];
 }
 
 export const CorporatePartnersMarquee: React.FC<CorporatePartnersMarqueeProps> = ({ partners }) => {
+  const { ref, isVisible } = useScrollAnimation();
+
   if (!partners || partners.length === 0) {
     return null;
   }
 
   return (
-    <section id="aliados" className="py-16 sm:py-20 bg-slate-50/60 border-t border-slate-200/60">
+    <section 
+      ref={ref as React.RefObject<HTMLElement>}
+      id="aliados" 
+      className={`py-16 sm:py-20 bg-slate-50/60 border-t border-slate-200/60 transition-all duration-700 ease-out ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}
+    >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10">
         
         {/* Encabezado */}

@@ -2,6 +2,7 @@ import React from 'react';
 import { ShieldCheck, ArrowRight } from 'lucide-react';
 import { useTenant } from '../context/TenantContext';
 import { FundsBreakdownItem } from '../types';
+import { useScrollAnimation } from '../hooks/useScrollAnimation';
 
 interface TransparencySectionProps {
   fundsBreakdown?: FundsBreakdownItem[];
@@ -11,6 +12,7 @@ const PALETTE = ['var(--tenant-primary)', '#3b82f6', '#f59e0b', '#8b5cf6', '#06b
 
 export const TransparencySection: React.FC<TransparencySectionProps> = ({ fundsBreakdown }) => {
   const { tenant } = useTenant();
+  const { ref, isVisible } = useScrollAnimation();
 
   // Si no hay datos de fondos, no renderizar sección vacía
   if (!fundsBreakdown || fundsBreakdown.length === 0) {
@@ -24,7 +26,11 @@ export const TransparencySection: React.FC<TransparencySectionProps> = ({ fundsB
     : 'sm:grid-cols-3';
 
   return (
-    <section id="transparencia" className="py-16 sm:py-24 bg-slate-50/80 border-t border-slate-200/60">
+    <section 
+      ref={ref as React.RefObject<HTMLElement>}
+      id="transparencia" 
+      className={`py-16 sm:py-24 bg-slate-50/80 border-t border-slate-200/60 transition-all duration-700 ease-out ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}
+    >
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
         
         {/* Encabezado */}
@@ -72,10 +78,10 @@ export const TransparencySection: React.FC<TransparencySectionProps> = ({ fundsB
                   className="space-y-1.5 border-l-2 pl-4"
                   style={{ borderColor: segColor }}
                 >
-                  <span className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight block">
+                  <span className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight block">
                     {item.amount || item.percentage} Bs.
                   </span>
-                  <span className="text-sm font-extrabold text-slate-800 uppercase tracking-wide block">
+                  <span className="text-sm font-bold text-slate-800 uppercase tracking-wide block">
                     {item.category}
                   </span>
                   {item.description && (
