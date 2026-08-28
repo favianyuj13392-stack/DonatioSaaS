@@ -6,6 +6,7 @@ use App\Models\Donation;
 use App\Models\Foundation;
 use App\Models\Subscription;
 use App\Models\TenantBillingLedger;
+use App\Services\ExchangeRate\ExchangeRateService;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 
@@ -17,6 +18,11 @@ class FinancialStatsOverview extends BaseWidget
     protected function getStats(): array
     {
         $currentMonth = now()->startOfMonth();
+        $rateService = app(ExchangeRateService::class);
+        $latestRate = $rateService->getLatestConfirmedRate('USD/BOB');
+        $exchangeRate = $latestRate ? (float) $latestRate->sell_rate : $rateService->getCurrentSellRate('USD/BOB');
+        $buyRate = $latestRate ? (float) $latestRate->buy_rate : 11.83;
+        $rateSource = $latestRate ? $latestRate->source : 'BCB';
 
         // 1. GMV Total del Mes (Agrupado por moneda)
         $bobGmv = (float) Donation::where('status', 'completed')
@@ -29,7 +35,6 @@ class FinancialStatsOverview extends BaseWidget
             ->where('paid_at', '>=', $currentMonth)
             ->sum('amount');
 
-        $exchangeRate = (float) config('donatio.usd_exchange_rate', 6.96);
         $totalGmvBobEquiv = $bobGmv + ($usdGmv * $exchangeRate);
 
         // 2. Comisión SaaS (Tu 2% del Mes en BOB)
@@ -56,6 +61,11 @@ class FinancialStatsOverview extends BaseWidget
         $activeSubscribers = Subscription::where('status', 'active')->count();
 
         return [
+            Stat::make('Dólar Oficial BCB (Venta)', 'Bs. ' . number_format($exchangeRate, 4))
+                ->description("Compra: Bs. " . number_format($buyRate, 4) . " · Fuente: {$rateSource}")
+                ->descriptionIcon('heroicon-m-currency-dollar')
+                ->color('success'),
+
             Stat::make('GMV Total Mes (Gross Volume)', 'Bs. ' . number_format($totalGmvBobEquiv, 2))
                 ->description("Desglose: Bs. " . number_format($bobGmv, 2) . " + $" . number_format($usdGmv, 2) . " USD")
                 ->descriptionIcon('heroicon-m-arrow-trending-up')

@@ -36,6 +36,7 @@ class AdminPanelProvider extends PanelProvider
                 \App\Filament\Resources\SubscriptionResource::class,
                 \App\Filament\Resources\DonationResource::class,
                 \App\Filament\Resources\TenantBillingLedgerResource::class,
+                \App\Filament\Resources\ExchangeRateResource::class,
             ])
             ->pages([
                 Pages\Dashboard::class,
