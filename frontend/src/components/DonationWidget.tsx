@@ -391,17 +391,17 @@ export const DonationWidget: React.FC = () => {
           <div>
             <label className="block text-xs sm:text-sm font-bold text-gray-800 mb-2">Monto de la donación</label>
             
-            {/* Montos Predefinidos */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {/* Montos Predefinidos Flexibles y Auto-adaptables (2, 3, 4, 5, 6 montos) */}
+            <div className="flex flex-wrap gap-2">
               {tiers.map((t) => (
                 <button
                   key={t.amount}
                   type="button"
                   onClick={() => handleSelectTier(t.amount)}
-                  className={`py-2.5 px-2 rounded-2xl text-center border-2 transition-all font-bold text-xs sm:text-sm ${
+                  className={`flex-1 min-w-[70px] sm:min-w-[80px] py-2.5 px-3 rounded-2xl text-center border-2 transition-all font-bold text-xs sm:text-sm whitespace-nowrap ${
                     !isCustom && amount === t.amount
                       ? 'border-[var(--tenant-primary)] bg-[var(--tenant-primary-soft)] text-[var(--tenant-primary)] shadow-sm'
-                      : 'border-gray-200 text-gray-700 hover:border-gray-300 bg-white'
+                      : 'border-gray-200 text-gray-700 hover:border-gray-300 bg-white hover:bg-gray-50'
                   }`}
                 >
                   <div>{t.amount} {currency}</div>
