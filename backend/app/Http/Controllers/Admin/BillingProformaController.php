@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Donation;
 use App\Models\Foundation;
 use App\Models\TenantBillingLedger;
+use App\Services\ExchangeRate\ExchangeRateService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -17,12 +18,19 @@ class BillingProformaController extends Controller
      */
     public function show(Request $request, string $period, int $foundationId): View
     {
-        $foundation = Foundation::findOrFail($foundationId);
-        $periodDate = Carbon::createFromFormat('Y-m', $period);
+        $foundation = Foundation::withoutGlobalScopes()->findOrFail($foundationId);
+        
+        try {
+            $periodDate = Carbon::createFromFormat('Y-m', $period);
+        } catch (\Throwable $e) {
+            $periodDate = now();
+            $period = $periodDate->format('Y-m');
+        }
+
         $periodName = $periodDate->locale('es')->isoFormat('MMMM YYYY');
         $proformaNumber = 'PRF-' . $periodDate->format('Ym') . '-' . ($foundation->code ?: 'TENANT' . $foundation->id);
 
-        $rateService = app(\App\Services\ExchangeRate\ExchangeRateService::class);
+        $rateService = app(ExchangeRateService::class);
         $periodEndDate = $periodDate->copy()->endOfMonth()->toDateString();
         $confirmedRate = $rateService->getConfirmedRateForDate($periodEndDate, 'USD/BOB') ?: $rateService->getLatestConfirmedRate('USD/BOB');
         $exchangeRate = $confirmedRate ? (float) $confirmedRate->sell_rate : $rateService->getCurrentSellRate('USD/BOB');
@@ -30,7 +38,7 @@ class BillingProformaController extends Controller
         $donations = Donation::withoutGlobalScopes()
             ->where('foundation_id', $foundation->id)
             ->where('status', 'completed')
-            ->whereRaw("to_char(paid_at, 'YYYY-MM') = ?", [$period])
+            ->whereRaw("to_char(COALESCE(paid_at, created_at), 'YYYY-MM') = ?", [$period])
             ->get();
 
         $cardDonations = $donations->where('payment_method', 'card');
