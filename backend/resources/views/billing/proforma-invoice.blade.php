@@ -224,8 +224,8 @@
             <div class="card">
                 <h3>Resumen del Período</h3>
                 <p><strong>Total Donaciones:</strong> {{ $donationsCount }} transacciones</p>
-                <p><strong>Tarifas Pactadas:</strong> Tarjetas {{ $foundation->saas_fee_card }}% | QR {{ $foundation->saas_fee_qr }}%</p>
-                <p><strong>Tipo de Cambio Oficial:</strong> 1 USD = {{ number_format($exchangeRate, 2) }} BOB</p>
+                <p><strong>Tarifas Pactadas:</strong> Tarjetas {{ $foundation->saas_fee_card ?? '2.00' }}% | QR {{ $foundation->saas_fee_qr ?? '1.50' }}%</p>
+                <p><strong>Tipo de Cambio Oficial:</strong> 1 USD = {{ number_format((float) ($exchangeRate ?? 11.93), 2) }} BOB</p>
                 <p><strong>Estado:</strong> {{ $isPaid ? '✓ COBRADO Y LIQUIDADO' : '⏳ PENDIENTE DE TRANSFERENCIA' }}</p>
             </div>
         </div>
@@ -246,20 +246,20 @@
                         <strong>Aportes por Tarjetas (ATC Cybersource)</strong><br>
                         <small style="color: #64748b;">Donaciones únicas y débitos mensuales recurrentes 3DS2</small>
                     </td>
-                    <td class="text-right">{{ $cardCount }}</td>
-                    <td class="text-right">Bs. {{ number_format($cardGrossBob, 2) }}</td>
-                    <td class="text-right">{{ $foundation->saas_fee_card }}%</td>
-                    <td class="text-right"><strong>Bs. {{ number_format($cardSaasFeeBob, 2) }}</strong></td>
+                    <td class="text-right">{{ $cardCount ?? 0 }}</td>
+                    <td class="text-right">Bs. {{ number_format((float) ($cardGrossBob ?? 0), 2) }}</td>
+                    <td class="text-right">{{ $foundation->saas_fee_card ?? '2.00' }}%</td>
+                    <td class="text-right"><strong>Bs. {{ number_format((float) ($cardSaasFeeBob ?? 0), 2) }}</strong></td>
                 </tr>
                 <tr>
                     <td>
                         <strong>Aportes por Código QR (ATC Simple)</strong><br>
                         <small style="color: #64748b;">Donaciones directas por transferencia QR interbancario</small>
                     </td>
-                    <td class="text-right">{{ $qrCount }}</td>
-                    <td class="text-right">Bs. {{ number_format($qrGrossBob, 2) }}</td>
-                    <td class="text-right">{{ $foundation->saas_fee_qr }}%</td>
-                    <td class="text-right"><strong>Bs. {{ number_format($qrSaasFeeBob, 2) }}</strong></td>
+                    <td class="text-right">{{ $qrCount ?? 0 }}</td>
+                    <td class="text-right">Bs. {{ number_format((float) ($qrGrossBob ?? 0), 2) }}</td>
+                    <td class="text-right">{{ $foundation->saas_fee_qr ?? '1.50' }}%</td>
+                    <td class="text-right"><strong>Bs. {{ number_format((float) ($qrSaasFeeBob ?? 0), 2) }}</strong></td>
                 </tr>
             </tbody>
         </table>

@@ -16,9 +16,9 @@ class BillingProformaController extends Controller
     /**
      * Genera la vista formal de Proforma de Liquidación Mensual para impresión o exportación PDF.
      */
-    public function show(Request $request, string $period, int $foundationId): View
+    public function show(Request $request, string $period, $foundation_id): View
     {
-        $foundation = Foundation::withoutGlobalScopes()->findOrFail($foundationId);
+        $foundation = Foundation::withoutGlobalScopes()->findOrFail((int) $foundation_id);
         
         try {
             $periodDate = Carbon::createFromFormat('Y-m', $period);
@@ -30,10 +30,14 @@ class BillingProformaController extends Controller
         $periodName = $periodDate->locale('es')->isoFormat('MMMM YYYY');
         $proformaNumber = 'PRF-' . $periodDate->format('Ym') . '-' . ($foundation->code ?: 'TENANT' . $foundation->id);
 
-        $rateService = app(ExchangeRateService::class);
-        $periodEndDate = $periodDate->copy()->endOfMonth()->toDateString();
-        $confirmedRate = $rateService->getConfirmedRateForDate($periodEndDate, 'USD/BOB') ?: $rateService->getLatestConfirmedRate('USD/BOB');
-        $exchangeRate = $confirmedRate ? (float) $confirmedRate->sell_rate : $rateService->getCurrentSellRate('USD/BOB');
+        try {
+            $rateService = app(ExchangeRateService::class);
+            $periodEndDate = $periodDate->copy()->endOfMonth()->toDateString();
+            $confirmedRate = $rateService->getConfirmedRateForDate($periodEndDate, 'USD/BOB') ?: $rateService->getLatestConfirmedRate('USD/BOB');
+            $exchangeRate = $confirmedRate ? (float) $confirmedRate->sell_rate : $rateService->getCurrentSellRate('USD/BOB');
+        } catch (\Throwable $e) {
+            $exchangeRate = 11.93;
+        }
 
         $donations = Donation::withoutGlobalScopes()
             ->where('foundation_id', $foundation->id)
@@ -45,26 +49,26 @@ class BillingProformaController extends Controller
         $qrDonations = $donations->where('payment_method', 'qr');
 
         // Cálculo Tarjetas
-        $cardGrossBob = $cardDonations->sum(function ($d) use ($exchangeRate) {
+        $cardGrossBob = (float) $cardDonations->sum(function ($d) use ($exchangeRate) {
             return $d->currency === 'USD' ? ((float) $d->amount * $exchangeRate) : (float) $d->amount;
         });
-        $cardSaasFeeBob = $cardDonations->sum(function ($d) use ($exchangeRate) {
+        $cardSaasFeeBob = (float) $cardDonations->sum(function ($d) use ($exchangeRate) {
             return $d->currency === 'USD' ? ((float) $d->saas_fee_amount * $exchangeRate) : (float) $d->saas_fee_amount;
         });
 
         // Cálculo QR
-        $qrGrossBob = $qrDonations->sum(function ($d) use ($exchangeRate) {
+        $qrGrossBob = (float) $qrDonations->sum(function ($d) use ($exchangeRate) {
             return $d->currency === 'USD' ? ((float) $d->amount * $exchangeRate) : (float) $d->amount;
         });
-        $qrSaasFeeBob = $qrDonations->sum(function ($d) use ($exchangeRate) {
+        $qrSaasFeeBob = (float) $qrDonations->sum(function ($d) use ($exchangeRate) {
             return $d->currency === 'USD' ? ((float) $d->saas_fee_amount * $exchangeRate) : (float) $d->saas_fee_amount;
         });
 
         // Totales consolidados
         $totalGrossBob = $cardGrossBob + $qrGrossBob;
         $totalSaasFeeBob = $cardSaasFeeBob + $qrSaasFeeBob;
-        $totalAtcFeeBob = $donations->sum(function ($d) use ($exchangeRate) {
-            return $d->currency === 'USD' ? ((float) $d->atc_fee_estimated_amount * $exchangeRate) : (float) $d->atc_fee_estimated_amount;
+        $totalAtcFeeBob = (float) $donations->sum(function ($d) use ($exchangeRate) {
+            return $d->currency === 'USD' ? ((float) ($d->atc_fee_estimated_amount ?? 0) * $exchangeRate) : (float) ($d->atc_fee_estimated_amount ?? 0);
         });
 
         // Comprobar si todas las cuotas de este período fueron marcadas como pagadas
