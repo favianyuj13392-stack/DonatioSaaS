@@ -498,4 +498,22 @@ class DonationCheckoutController extends Controller
             ->header('Access-Control-Allow-Headers', '*')
             ->header('Access-Control-Allow-Private-Network', 'true');
     }
+
+    /**
+     * Descarga o visualiza el Recibo Oficial de Donación en formato HTML / PDF.
+     * Endpoint: GET /api/v1/donations/{id}/receipt
+     */
+    public function downloadReceipt(int $id)
+    {
+        $donation = Donation::withoutGlobalScopes()
+            ->with(['foundation', 'donor', 'campaign'])
+            ->findOrFail($id);
+
+        return view('receipts.donation-receipt', [
+            'donation'   => $donation,
+            'foundation' => $donation->foundation,
+            'donor'      => $donation->donor,
+            'campaign'   => $donation->campaign,
+        ]);
+    }
 }
