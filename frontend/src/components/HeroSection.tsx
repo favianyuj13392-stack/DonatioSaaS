@@ -47,7 +47,7 @@ export const HeroSection: React.FC = () => {
   return (
     <section
       ref={heroRef}
-      className="w-full relative flex flex-col lg:flex-row min-h-[100svh] lg:min-h-[92vh] overflow-hidden"
+      className="w-full relative flex flex-col xl:flex-row items-center justify-between min-h-[100svh] xl:min-h-[92vh] pt-24 pb-16 lg:py-20 xl:py-16 px-4 sm:px-8 lg:px-12 xl:px-16 gap-10 xl:gap-8"
     >
       {/* ── Background Image (full cover, behind everything) ── */}
       {banner ? (
@@ -85,25 +85,25 @@ export const HeroSection: React.FC = () => {
         aria-hidden="true"
       />
 
-      {/* ── LEFT COLUMN: Editorial copy (55% on desktop) ── */}
-      <div className="relative z-20 flex flex-col justify-center px-6 sm:px-10 lg:px-16 xl:px-20 pt-28 pb-16 lg:pt-0 lg:pb-0 lg:w-[58%] min-h-[60vh] lg:min-h-0">
+      {/* ── LEFT COLUMN: Editorial copy (Adaptive width) ── */}
+      <div className="relative z-20 flex flex-col justify-center w-full xl:w-[48%] 2xl:w-[52%] max-w-3xl xl:max-w-none text-left">
 
         {/* Eyebrow badge */}
         <div
-          className={`mb-6 inline-flex items-center gap-2 transition-all duration-700 ease-out ${textVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
+          className={`mb-4 sm:mb-6 inline-flex items-center gap-2 transition-all duration-700 ease-out ${textVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
         >
           <span
-            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-[11px] font-black uppercase tracking-[0.15em] bg-white/15 text-white backdrop-blur-sm border border-white/25"
+            className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-[11px] font-black uppercase tracking-[0.15em] bg-white/15 text-white backdrop-blur-sm border border-white/25"
           >
             <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
             {eyebrowText}
           </span>
         </div>
 
-        {/* Display headline — the visual anchor */}
+        {/* Display headline — fluid typography */}
         <h1
-          className={`text-white font-black leading-[1.02] tracking-tight mb-6 transition-all duration-700 ease-out delay-75 ${textVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}
-          style={{ fontSize: 'clamp(2.2rem, 4.2vw, 4.2rem)' }}
+          className={`text-white font-black leading-[1.06] tracking-tight mb-5 transition-all duration-700 ease-out delay-75 ${textVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}
+          style={{ fontSize: 'clamp(1.9rem, 3.4vw, 3.8rem)' }}
         >
           {headline}
         </h1>
@@ -111,7 +111,7 @@ export const HeroSection: React.FC = () => {
         {/* Description */}
         {description && (
           <p
-            className={`text-white/80 text-base sm:text-lg lg:text-xl leading-relaxed max-w-lg mb-8 transition-all duration-700 ease-out delay-150 ${textVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}
+            className={`text-white/85 text-sm sm:text-base lg:text-lg leading-relaxed max-w-xl mb-6 sm:mb-8 transition-all duration-700 ease-out delay-150 ${textVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}
           >
             {description}
           </p>
@@ -120,18 +120,18 @@ export const HeroSection: React.FC = () => {
         {/* Campaign progress bar (campaign mode only) */}
         {isCampaignMode && monetaryGoal > 0 && (
           <div
-            className={`mb-8 bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl p-5 max-w-md transition-all duration-700 ease-out delay-200 ${textVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}
+            className={`mb-6 sm:mb-8 bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-4 sm:p-5 max-w-lg transition-all duration-700 ease-out delay-200 ${textVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}
           >
             <div className="flex justify-between items-baseline mb-2">
               <div>
                 <span className="text-[11px] font-bold uppercase tracking-wider text-white/60 block mb-0.5">Recaudado</span>
-                <span className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+                <span className="text-xl sm:text-2xl font-black text-white tracking-tight">
                   Bs. {currentAmount.toLocaleString('es-BO', { minimumFractionDigits: 2 })}
                 </span>
               </div>
               <div className="text-right">
                 <span className="text-[11px] font-bold uppercase tracking-wider text-white/60 block mb-0.5">Meta</span>
-                <span className="text-sm font-bold text-white/70">
+                <span className="text-xs sm:text-sm font-bold text-white/70">
                   Bs. {monetaryGoal.toLocaleString('es-BO', { minimumFractionDigits: 2 })}
                 </span>
               </div>
@@ -161,13 +161,13 @@ export const HeroSection: React.FC = () => {
           </div>
         )}
 
-        {/* CTA — scroll to widget on mobile, just a visual anchor */}
+        {/* CTA Anchor & Scroll Down Button */}
         <div
           className={`flex items-center gap-4 transition-all duration-700 ease-out delay-300 ${textVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}
         >
           <a
             href="#donacion"
-            className="btn-tenant-primary inline-flex items-center gap-2 px-7 py-3.5 rounded-2xl text-sm font-black shadow-xl active:scale-95 lg:hidden"
+            className="btn-tenant-primary inline-flex items-center gap-2 px-6 py-3 rounded-2xl text-xs sm:text-sm font-black shadow-xl active:scale-95 xl:hidden"
           >
             Donar ahora
           </a>
@@ -182,21 +182,20 @@ export const HeroSection: React.FC = () => {
         </div>
       </div>
 
-      {/* ── RIGHT COLUMN: Donation Widget (45% on desktop, floating panel) ── */}
+      {/* ── RIGHT COLUMN: Donation Widget Container ── */}
       <div
         id="donacion"
-        className={`relative z-20 flex flex-col justify-center px-4 sm:px-6 lg:px-8 xl:px-10 py-8 lg:py-16 lg:w-[42%] transition-all duration-700 ease-out ${widgetVisible ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-8'}`}
+        className={`relative z-20 flex flex-col justify-center w-full xl:w-[52%] 2xl:w-[48%] max-w-2xl transition-all duration-700 ease-out ${widgetVisible ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-8'}`}
       >
-        {/* Glassmorphism card wrapper for the widget */}
-        <div className="lg:bg-white/10 lg:backdrop-blur-md lg:rounded-3xl lg:p-1 lg:border lg:border-white/20 lg:shadow-2xl">
-          <div className="bg-white rounded-2xl lg:rounded-[1.1rem] overflow-hidden shadow-2xl">
+        <div className="bg-white/10 backdrop-blur-md rounded-3xl p-1 sm:p-1.5 border border-white/20 shadow-2xl">
+          <div className="bg-white rounded-2xl sm:rounded-[1.2rem] overflow-hidden shadow-xl">
             <DonationWidget />
           </div>
         </div>
       </div>
 
       {/* ── Scroll indicator at bottom center ── */}
-      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 hidden lg:flex flex-col items-center gap-2 animate-bounce pointer-events-none">
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 hidden 2xl:flex flex-col items-center gap-1 animate-bounce pointer-events-none">
         <ChevronDown className="w-5 h-5 text-white/50" />
       </div>
     </section>
