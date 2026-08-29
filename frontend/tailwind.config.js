@@ -8,9 +8,9 @@ export default {
     extend: {
       colors: {
         tenant: {
-          primary: 'var(--tenant-primary, #db2777)',
-          hover: 'var(--tenant-hover, #be185d)',
-          light: 'var(--tenant-light, #fdf2f8)',
+          primary: 'var(--tenant-primary, #059669)',
+          hover: 'var(--tenant-hover, #047857)',
+          light: 'var(--tenant-light, rgba(5,150,105,0.10))',
           secondary: 'var(--tenant-secondary, #0f172a)',
         },
       },

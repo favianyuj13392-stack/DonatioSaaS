@@ -29,10 +29,10 @@ import {
 } from 'lucide-react';
 
 const FALLBACK_TIERS: DonationTier[] = [
-  { amount: 30, label: 'Alimentación de 1 día (niño + mamá)', is_default: false },
-  { amount: 50, label: '1 Kit de medicinas básicas para quimioterapia', is_default: true },
-  { amount: 100, label: '3 Días de albergue y atención médica integral', is_default: false },
-  { amount: 250, label: 'Tratamiento semanal y análisis de laboratorio', is_default: false },
+  { amount: 30, label: 'Aporte básico', is_default: false },
+  { amount: 50, label: 'Aporte solidario', is_default: true },
+  { amount: 100, label: 'Aporte transformador', is_default: false },
+  { amount: 250, label: 'Aporte institucional', is_default: false },
 ];
 
 export const DonationCheckoutContainer: React.FC = () => {
@@ -118,7 +118,7 @@ export const DonationCheckoutContainer: React.FC = () => {
 
   const currentAmount = isCustom ? parseFloat(customAmount) || 0 : amount;
   const currentTier = tiers.find(t => t.amount === currentAmount);
-  const impactLabel = currentTier?.label || (isCustom ? 'Aporte solidario para medicamentos y albergue integral' : 'Cubre insumos y atención médica');
+  const impactLabel = currentTier?.label || (isCustom ? 'Aporte solidario personalizado' : 'Aporte directo a la causa');
 
   const handleSelectTier = (tierAmount: number) => {
     setIsCustom(false);
@@ -361,7 +361,7 @@ export const DonationCheckoutContainer: React.FC = () => {
           {/* Badge temático sutil */}
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-extrabold uppercase tracking-wider text-rose-700 bg-rose-50 border border-rose-200/80">
             <span className="w-2 h-2 rounded-full bg-rose-600 animate-pulse" />
-            <span>Causa Solidaria Oficial en Bolivia</span>
+            <span>Causa Solidaria Oficial</span>
           </div>
 
           {/* Título H1 Grande y Elegante */}

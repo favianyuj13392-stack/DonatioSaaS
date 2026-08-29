@@ -8,6 +8,16 @@ import {
 } from '../services/api';
 import { applyTenantTheme } from '../utils/theme';
 
+function updateMetaTag(property: string, content: string) {
+  let meta = document.querySelector(`meta[property="${property}"]`) as HTMLMetaElement;
+  if (!meta) {
+    meta = document.createElement('meta');
+    meta.setAttribute('property', property);
+    document.head.appendChild(meta);
+  }
+  meta.content = content;
+}
+
 export type RouteMode = 'institutional' | 'campaign' | 'campaigns_list';
 
 interface TenantContextType {
@@ -104,7 +114,11 @@ export const TenantProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         if (listRes.tenant.primary_color) {
           applyTenantTheme(listRes.tenant);
         }
-        document.title = `Campañas | ${listRes.tenant.name}`;
+        document.title = `${listRes.tenant.name} - Donaciones Seguras`;
+        updateMetaTag('og:title', listRes.tenant.name);
+        updateMetaTag('og:description', `Catálogo de causas solidarias y campañas activas de ${listRes.tenant.name}`);
+        updateMetaTag('og:image', listRes.tenant.logo_url || '');
+        updateMetaTag('og:type', 'website');
       } else if (mode === 'institutional') {
         // Cargar homepage institucional del tenant
         const instRes = await fetchPublicTenant(subdomain);
@@ -112,7 +126,11 @@ export const TenantProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         setCampaign(instRes.featured_campaign);
         setPaymentProviders(instRes.payment_providers || []);
         applyTenantTheme(instRes.tenant);
-        document.title = `${instRes.tenant.name} | Portal Institucional`;
+        document.title = `${instRes.tenant.name} - Donaciones Seguras`;
+        updateMetaTag('og:title', instRes.tenant.name);
+        updateMetaTag('og:description', instRes.tenant.mission || instRes.tenant.about_text || '');
+        updateMetaTag('og:image', instRes.tenant.logo_url || '');
+        updateMetaTag('og:type', 'website');
       } else {
         // Cargar detalle de campaña (o default)
         const response = await fetchPublicCampaign(subdomain, slug || 'default');
@@ -126,8 +144,13 @@ export const TenantProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
         // Actualizar título de la pestaña
         document.title = response.campaign.title
-          ? `${response.campaign.title} | ${response.tenant.name}`
-          : response.tenant.name;
+          ? `${response.campaign.title} - ${response.tenant.name}`
+          : `${response.tenant.name} - Donaciones Seguras`;
+        
+        updateMetaTag('og:title', document.title);
+        updateMetaTag('og:description', response.campaign.description || response.tenant.mission || response.tenant.about_text || '');
+        updateMetaTag('og:image', response.campaign.banner_url || response.tenant.logo_url || '');
+        updateMetaTag('og:type', 'website');
       }
     } catch (err: any) {
       console.error('[TenantContext Error]:', err);

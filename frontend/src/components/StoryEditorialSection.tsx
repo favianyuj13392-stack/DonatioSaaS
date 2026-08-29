@@ -1,6 +1,8 @@
 import React from 'react';
 import { Heart, MapPin, Quote } from 'lucide-react';
 import { TestimonialItem } from '../types';
+import { useScrollAnimation } from '../hooks/useScrollAnimation';
+import { renderSimpleMarkdown } from '../utils/simpleMarkdown';
 
 interface StoryEditorialSectionProps {
   storyMarkdown?: string | null;
@@ -15,6 +17,8 @@ export const StoryEditorialSection: React.FC<StoryEditorialSectionProps> = ({
   locationCity,
   testimonial,
 }) => {
+  const { ref, isVisible } = useScrollAnimation();
+
   if (!storyMarkdown) {
     return null;
   }
@@ -23,20 +27,24 @@ export const StoryEditorialSection: React.FC<StoryEditorialSectionProps> = ({
   const hasTestimonial = !!testimonial && !!testimonial.quote;
 
   return (
-    <section id="historia" className="py-16 sm:py-24 bg-white border-t border-slate-100">
+    <section 
+      ref={ref as React.RefObject<HTMLElement>}
+      id="historia" 
+      className={`py-16 sm:py-24 bg-slate-50/80 border-t border-slate-200/60 transition-all duration-700 ease-out ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}
+    >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
         
         {/* Encabezado */}
         <div className="text-center max-w-3xl mx-auto space-y-3">
           <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider badge-tenant">
             <Heart className="w-3.5 h-3.5 fill-current" />
+
             <span>Historia que Inspira</span>
           </div>
           <h2 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight">
             Nuestra Causa en Primera Persona
           </h2>
         </div>
-
         {/* Layout Recompuesto según presencia de Testimonio */}
         {hasTestimonial ? (
           /* ========================================================================= */
@@ -45,13 +53,14 @@ export const StoryEditorialSection: React.FC<StoryEditorialSectionProps> = ({
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
             
             {/* 1. Columna de Texto Editorial (5 cols) */}
-            <div className="lg:col-span-5 flex flex-col justify-center space-y-5 bg-slate-50/60 p-8 rounded-3xl border border-slate-200/60">
-              <h3 className="text-xl sm:text-2xl font-black text-slate-900 leading-snug">
+            <div className="lg:col-span-5 flex flex-col justify-center space-y-5 bg-white p-8 rounded-3xl border border-slate-200/60 shadow-sm">
+              <h3 className="text-xl sm:text-2xl font-extrabold text-slate-900 leading-snug">
                 Un futuro mejor es posible cuando trabajamos juntos.
               </h3>
-              <div className="space-y-3 text-sm sm:text-base text-slate-600 leading-relaxed whitespace-pre-line">
-                {storyMarkdown}
-              </div>
+              <div 
+                className="space-y-3 text-sm sm:text-base text-slate-600 leading-relaxed"
+                dangerouslySetInnerHTML={{ __html: renderSimpleMarkdown(storyMarkdown) }}
+              />
             </div>
 
             {/* 2. Fotografía Central en Landscape (4 cols) */}
@@ -73,7 +82,7 @@ export const StoryEditorialSection: React.FC<StoryEditorialSectionProps> = ({
             <div
               className="lg:col-span-3 rounded-3xl p-7 flex flex-col justify-between space-y-6 shadow-md border border-slate-200/80"
               style={{
-                backgroundColor: 'var(--tenant-surface-alt, #f8fafc)',
+                backgroundColor: 'var(--tenant-surface-alt, #ffffff)',
               }}
             >
               <div className="space-y-3">
@@ -87,7 +96,7 @@ export const StoryEditorialSection: React.FC<StoryEditorialSectionProps> = ({
               </div>
 
               <div className="pt-4 border-t border-slate-200/70">
-                <span className="block text-xs font-black text-slate-900 uppercase tracking-wide">
+                <span className="block text-xs font-bold text-slate-900 uppercase tracking-wide">
                   {testimonial.author_name}
                 </span>
                 {testimonial.author_role && (
@@ -124,12 +133,13 @@ export const StoryEditorialSection: React.FC<StoryEditorialSectionProps> = ({
 
             {/* Narrativa Editorial (7 cols) */}
             <div className="lg:col-span-7 space-y-6">
-              <h3 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight leading-tight">
+              <h3 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight leading-tight">
                 El impacto de tu generosidad en nuestras comunidades.
               </h3>
-              <div className="space-y-4 text-base sm:text-lg text-slate-600 leading-relaxed whitespace-pre-line">
-                {storyMarkdown}
-              </div>
+              <div 
+                className="space-y-4 text-base sm:text-lg text-slate-600 leading-relaxed"
+                dangerouslySetInnerHTML={{ __html: renderSimpleMarkdown(storyMarkdown) }}
+              />
             </div>
 
           </div>

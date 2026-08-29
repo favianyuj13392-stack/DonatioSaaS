@@ -18,9 +18,13 @@
   --tenant-surface-alt: #f8fafc;
   --tenant-border: #e2e8f0;
 
-  /* Aliases para retrocompatibilidad */
+  /* Aliases for backwards compatibility */
   --tenant-hover: var(--tenant-primary-hover);
   --tenant-light: var(--tenant-primary-soft);
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 body {
@@ -29,7 +33,9 @@ body {
   background-color: var(--tenant-surface);
 }
 
-/* Clases de utilidad para el Design System */
+/* ─────────────────────────────────────────
+   Button & badge design tokens
+───────────────────────────────────────── */
 .btn-tenant-primary {
   background-color: var(--tenant-primary);
   color: var(--tenant-on-primary);
@@ -38,6 +44,12 @@ body {
 
 .btn-tenant-primary:hover {
   background-color: var(--tenant-primary-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 8px 25px -5px color-mix(in srgb, var(--tenant-primary) 40%, transparent);
+}
+
+.btn-tenant-primary:active {
+  transform: translateY(0);
 }
 
 .btn-tenant-primary:focus-visible {
@@ -57,7 +69,176 @@ body {
   transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Animaciones suaves para micro-interacciones */
+/* ─────────────────────────────────────────
+   Editorial / Emotional design system
+───────────────────────────────────────── */
+
+/* Full-bleed section with tenant primary color */
+.section-tenant-primary {
+  background-color: var(--tenant-primary);
+  color: var(--tenant-on-primary);
+}
+
+/* Gradient left-to-transparent for split hero */
+.hero-gradient-left {
+  background: linear-gradient(
+    to right,
+    rgba(0, 0, 0, 0.75) 0%,
+    rgba(0, 0, 0, 0.55) 40%,
+    rgba(0, 0, 0, 0.10) 75%,
+    transparent 100%
+  );
+}
+
+/* Giant editorial numbers (e.g. 01, 02, 03 in ProgramsSection) */
+.editorial-number {
+  font-size: clamp(5rem, 10vw, 9rem);
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  color: var(--tenant-primary);
+  opacity: 0.15;
+  user-select: none;
+  pointer-events: none;
+}
+
+/* Gradient text using tenant color */
+.text-gradient-tenant {
+  background: linear-gradient(135deg, var(--tenant-primary) 0%, var(--tenant-secondary, var(--tenant-primary)) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Pull quote styling */
+.pull-quote {
+  border-left: 4px solid rgba(255, 255, 255, 0.4);
+  padding-left: 1.5rem;
+}
+
+/* ─────────────────────────────────────────
+   Animations
+───────────────────────────────────────── */
+
+/* Shimmer loading animation */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.animate-shimmer {
+  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.8s ease-in-out infinite;
+}
+
+/* Float animation for hero widget */
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-6px); }
+}
+
+.animate-float {
+  animation: float 4s ease-in-out infinite;
+}
+
+/* Stagger animation delays for list items */
+.stagger-1 { animation-delay: 0.05s; }
+.stagger-2 { animation-delay: 0.10s; }
+.stagger-3 { animation-delay: 0.15s; }
+.stagger-4 { animation-delay: 0.20s; }
+.stagger-5 { animation-delay: 0.25s; }
+.stagger-6 { animation-delay: 0.30s; }
+
+/* Fade-in-up base for stagger items */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Scale-in for impact cards */
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Dark noise texture overlay (CSS only) */
+.texture-noise::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events: none;
+  opacity: 0.03;
+}
+
+/* ─────────────────────────────────────────
+   Micro-interactions
+───────────────────────────────────────── */
 .transition-all-custom {
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Card hover lift */
+.card-hover {
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.card-hover:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.15);
+}
+
+/* ─────────────────────────────────────────
+   Accessibility
+───────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .progress-bar-tenant {
+    transition: none;
+  }
+
+  .animate-float,
+  .animate-shimmer,
+  .animate-fade-in-up,
+  .animate-scale-in {
+    animation: none !important;
+  }
+
+  .card-hover:hover {
+    transform: none;
+  }
+}
+
+/* ─────────────────────────────────────────
+   Prevent iOS Safari auto-zoom on input focus
+───────────────────────────────────────── */
+input, select, textarea {
+  font-size: 16px;
 }

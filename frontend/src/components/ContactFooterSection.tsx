@@ -3,9 +3,14 @@ import { useTenant } from '../context/TenantContext';
 import { Mail, Phone, MapPin, ShieldCheck, Lock, CreditCard, QrCode } from 'lucide-react';
 
 export const ContactFooterSection: React.FC = () => {
-  const { tenant, navigateToHome, navigateToCampaigns } = useTenant();
+  const { tenant, navigateToHome, navigateToCampaigns, paymentProviders } = useTenant();
 
   if (!tenant) return null;
+
+  const activeProviders = paymentProviders?.filter(p => p.is_active !== false) || [];
+  const providersText = activeProviders.length > 0
+    ? activeProviders.map(p => p.name).join(', ')
+    : null;
 
   return (
     <footer id="contacto" className="bg-slate-950 text-slate-400 border-t border-slate-800 text-xs">
@@ -38,7 +43,7 @@ export const ContactFooterSection: React.FC = () => {
             </button>
 
             <p className="text-slate-400 text-xs sm:text-sm leading-relaxed max-w-sm">
-              {tenant.mission || 'Organización sin fines de lucro comprometida con el desarrollo social, la transparencia y el impacto medible en Bolivia.'}
+              {tenant.mission || 'Organización sin fines de lucro comprometida con el desarrollo social, la transparencia y el impacto medible.'}
             </p>
 
             {tenant.location_city && (
@@ -156,7 +161,11 @@ export const ContactFooterSection: React.FC = () => {
                 <span>Procesamiento de Pago Seguro</span>
               </div>
               <p className="text-[11px] text-slate-400 leading-snug">
-                Autorizado con <strong>ATC Red Enlace</strong> y protocolo <strong>Cybersource 3DS2</strong>.
+                {providersText ? (
+                  <>Autorizado y procesado de forma segura a través de <strong>{providersText}</strong>.</>
+                ) : (
+                  <>Procesamiento seguro certificado con tecnología y cifrado de alta seguridad.</>
+                )}
               </p>
               <div className="flex items-center gap-2 pt-1 text-[10px] text-slate-400">
                 <span className="flex items-center gap-1 bg-white/10 px-2 py-0.5 rounded">

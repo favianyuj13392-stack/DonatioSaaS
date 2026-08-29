@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { QrResponse } from '../types';
 import { checkQrStatus } from '../services/api';
-import { QrCode, Clock, X } from 'lucide-react';
+import { QrCode, Clock, X, Copy, Download } from 'lucide-react';
 
 interface QrDisplayModalProps {
   qrData: QrResponse;
@@ -55,6 +55,23 @@ export const QrDisplayModal: React.FC<QrDisplayModalProps> = ({
   const minutes = Math.floor(secondsRemaining / 60);
   const seconds = secondsRemaining % 60;
 
+  const handleCopyCode = () => {
+    // @ts-ignore - in case qr_raw_code is typed differently
+    if (qrData.qr.qr_raw_code) {
+      // @ts-ignore
+      navigator.clipboard.writeText(qrData.qr.qr_raw_code);
+    }
+  };
+
+  const handleDownloadQr = () => {
+    const link = document.createElement('a');
+    link.href = qrData.qr.qr_image_url;
+    link.download = 'qr-donacion.png';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
       <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-gray-100 relative text-center">
@@ -78,12 +95,28 @@ export const QrDisplayModal: React.FC<QrDisplayModalProps> = ({
         </p>
 
         {/* Imagen del Código QR */}
-        <div className="bg-gray-50 p-4 rounded-2xl border border-gray-200 inline-block mb-4 shadow-inner">
+        <div className="relative bg-gray-50 p-4 rounded-2xl border border-gray-200 inline-block mb-4 shadow-inner">
           <img
             src={qrData.qr.qr_image_url}
             alt="Código QR de Donación"
             className="w-48 h-48 mx-auto object-contain"
           />
+          {secondsRemaining <= 0 && (
+            <div className="absolute inset-0 bg-white/80 backdrop-blur-[2px] flex flex-col items-center justify-center rounded-2xl">
+              <span className="font-bold text-gray-900 mb-2">QR Expirado</span>
+              <button onClick={() => window.location.reload()} className="px-3 py-1.5 bg-gray-900 text-white text-xs font-semibold rounded-lg">Generar nuevo</button>
+            </div>
+          )}
+        </div>
+
+        {/* Acciones del QR */}
+        <div className="flex justify-center gap-2 mb-4">
+          <button onClick={handleCopyCode} className="flex items-center gap-1 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium rounded-lg transition">
+            <Copy className="w-3.5 h-3.5" /> Copiar código
+          </button>
+          <button onClick={handleDownloadQr} className="flex items-center gap-1 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium rounded-lg transition">
+            <Download className="w-3.5 h-3.5" /> Descargar imagen QR
+          </button>
         </div>
 
         {/* Referencia y Temporizador */}
