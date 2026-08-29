@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Heart, Download, X, Share2, CheckCircle2 } from 'lucide-react';
 import { Tenant } from '../types';
 import { useTenant } from '../context/TenantContext';
@@ -24,7 +25,13 @@ export const DonationSuccessModal: React.FC<DonationSuccessModalProps> = ({
   campaignTitle,
   onClose,
 }) => {
+  const [mounted, setMounted] = useState(false);
   const { campaign } = useTenant();
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const effectiveCampaignTitle = campaignTitle || campaign?.title;
   const tenantName = tenant?.name || 'la organización';
   const campaignSuffix = effectiveCampaignTitle ? ` en la campaña "${effectiveCampaignTitle}"` : '';
@@ -33,14 +40,17 @@ export const DonationSuccessModal: React.FC<DonationSuccessModalProps> = ({
   );
   const whatsappShareUrl = `https://wa.me/?text=${shareText}`;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-md animate-fadeIn">
+  if (!mounted) return null;
+
+  const modalContent = (
+    <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fadeIn">
       <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-10 shadow-2xl border border-slate-100 relative text-center transform transition-all animate-scaleUp">
         
         {/* Botón de Cerrar */}
         <button
           onClick={onClose}
           className="absolute top-5 right-5 text-slate-400 hover:text-slate-700 transition p-2 rounded-full hover:bg-slate-100"
+          aria-label="Cerrar modal"
         >
           <X className="w-5 h-5" />
         </button>
@@ -123,4 +133,6 @@ export const DonationSuccessModal: React.FC<DonationSuccessModalProps> = ({
       </div>
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 };

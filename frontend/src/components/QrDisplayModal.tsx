@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { QrResponse } from '../types';
 import { checkQrStatus } from '../services/api';
 import { QrCode, Clock, X, Copy, Download } from 'lucide-react';
@@ -14,8 +15,13 @@ export const QrDisplayModal: React.FC<QrDisplayModalProps> = ({
   onSuccess,
   onClose,
 }) => {
+  const [mounted, setMounted] = useState(false);
   const [secondsRemaining, setSecondsRemaining] = useState<number>(600); // 10 minutos
   const [isChecking, setIsChecking] = useState<boolean>(true);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Cuenta regresiva del temporizador
   useEffect(() => {
@@ -72,18 +78,21 @@ export const QrDisplayModal: React.FC<QrDisplayModalProps> = ({
     document.body.removeChild(link);
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
-      <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-gray-100 relative text-center">
+  if (!mounted) return null;
+
+  const modalContent = (
+    <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fadeIn">
+      <div className="bg-white rounded-3xl max-w-sm w-full p-6 sm:p-7 shadow-2xl border border-gray-100 relative text-center transform transition-all animate-scaleUp">
         {/* Botón Cerrar */}
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition"
+          className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition p-1 rounded-full hover:bg-gray-100"
+          aria-label="Cerrar modal"
         >
           <X className="w-5 h-5" />
         </button>
 
-        <div className="inline-flex p-3 rounded-2xl bg-tenant-light text-tenant-primary mb-3">
+        <div className="inline-flex p-3 rounded-2xl bg-sky-50 text-sky-600 mb-3">
           <QrCode className="w-8 h-8" />
         </div>
 
@@ -111,11 +120,11 @@ export const QrDisplayModal: React.FC<QrDisplayModalProps> = ({
 
         {/* Acciones del QR */}
         <div className="flex justify-center gap-2 mb-4">
-          <button onClick={handleCopyCode} className="flex items-center gap-1 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium rounded-lg transition">
+          <button onClick={handleCopyCode} className="flex items-center gap-1 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-lg transition active:scale-95">
             <Copy className="w-3.5 h-3.5" /> Copiar código
           </button>
-          <button onClick={handleDownloadQr} className="flex items-center gap-1 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium rounded-lg transition">
-            <Download className="w-3.5 h-3.5" /> Descargar imagen QR
+          <button onClick={handleDownloadQr} className="flex items-center gap-1 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-lg transition active:scale-95">
+            <Download className="w-3.5 h-3.5" /> Descargar QR
           </button>
         </div>
 
@@ -140,4 +149,6 @@ export const QrDisplayModal: React.FC<QrDisplayModalProps> = ({
       </div>
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 };

@@ -390,6 +390,8 @@ export const DonationWidget: React.FC = () => {
           {/* 1. Monto de la Donación */}
           <div>
             <label className="block text-xs sm:text-sm font-bold text-gray-800 mb-2">Monto de la donación</label>
+            
+            {/* Montos Predefinidos */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {tiers.map((t) => (
                 <button
@@ -405,26 +407,35 @@ export const DonationWidget: React.FC = () => {
                   <div>{t.amount} {currency}</div>
                 </button>
               ))}
+            </div>
 
-              {/* Input personalizado con selector de divisa */}
-              <div className="relative flex items-center col-span-2 sm:col-span-1">
-                <input
-                  type="text"
-                  placeholder="Otro"
-                  value={customAmount}
-                  onChange={handleCustomAmountChange}
-                  className={`w-full h-full py-2 pl-3 pr-12 rounded-2xl border-2 text-xs sm:text-sm font-bold outline-none transition-all ${
-                    isCustom
-                      ? 'border-[var(--tenant-primary)] bg-[var(--tenant-primary-soft)] text-[var(--tenant-primary)]'
-                      : 'border-gray-200 focus:border-[var(--tenant-primary)] text-gray-800'
-                  }`}
-                />
+            {/* Input Personalizado con selector de divisa independiente y holgado */}
+            <div className="mt-2.5 relative flex items-center">
+              <div className="absolute left-3.5 text-xs sm:text-sm font-bold text-gray-400 pointer-events-none">
+                {currency === 'USD' ? '$' : 'Bs.'}
+              </div>
+              <input
+                type="number"
+                min="1"
+                step="any"
+                placeholder="Ingresar otro monto personalizado..."
+                value={customAmount}
+                onChange={handleCustomAmountChange}
+                className={`w-full py-2.5 pl-10 pr-24 rounded-2xl border-2 text-xs sm:text-sm font-bold outline-none transition-all ${
+                  isCustom
+                    ? 'border-[var(--tenant-primary)] bg-[var(--tenant-primary-soft)] text-[var(--tenant-primary)] shadow-xs'
+                    : 'border-gray-200 focus:border-[var(--tenant-primary)] text-gray-800 bg-gray-50/50 hover:bg-white'
+                }`}
+              />
+              <div className="absolute right-1.5 flex items-center">
                 <button
                   type="button"
                   onClick={() => setCurrency(currency === 'Bs' ? 'USD' : 'Bs')}
-                  className="absolute right-1.5 px-1.5 py-1 text-[11px] font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition"
+                  title="Cambiar divisa"
+                  className="px-2.5 py-1 text-xs font-black text-gray-700 bg-white hover:bg-gray-100 border border-gray-200 rounded-xl shadow-2xs transition flex items-center gap-1"
                 >
-                  {currency} ▾
+                  <span>{currency}</span>
+                  <span className="text-[10px] text-gray-400">▾</span>
                 </button>
               </div>
             </div>
