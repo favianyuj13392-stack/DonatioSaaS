@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Log;
 class AtcSignatureService
 {
     /**
-     * Retorna el Host de Cybersource según el entorno del tenant (Sandbox vs Prod).
+     * Retorna el Host de Cybersource limpio según el entorno del tenant (Sandbox vs Prod).
      */
     public static function getHost(Foundation $tenant): string
     {
@@ -23,8 +23,11 @@ class AtcSignatureService
 
         if ($tenant->is_sandbox || $isDummyKey) {
             $configuredBase = config('services.atc.base_url', 'https://apitest.cybersource.com');
-            $parsed = parse_url($configuredBase);
-            return $parsed['host'] ?? 'apitest.cybersource.com';
+            if (str_starts_with($configuredBase, 'http://') || str_starts_with($configuredBase, 'https://')) {
+                $parsed = parse_url($configuredBase);
+                return $parsed['host'] ?? 'apitest.cybersource.com';
+            }
+            return trim(explode('/', $configuredBase)[0]);
         }
 
         return 'api.cybersource.com';
@@ -35,8 +38,9 @@ class AtcSignatureService
      */
     public static function generateAuthHeaders(Foundation $tenant, string $method, string $path, ?string $bodyJson = null): array
     {
-        $host    = self::getHost($tenant);
-        $dateStr = gmdate('D, d M Y H:i:s GMT');
+        $host       = self::getHost($tenant);
+        $cleanPath  = '/' . ltrim($path, '/');
+        $dateStr    = gmdate('D, d M Y H:i:s GMT');
 
         $rawKeyId   = (string) ($tenant->atc_api_key_id ?? '');
         $isDummyKey = empty($rawKeyId) 
@@ -54,7 +58,7 @@ class AtcSignatureService
         if (in_array($methodLower, ['post', 'put', 'patch']) && $bodyJson !== null) {
             $digest = 'SHA-256=' . base64_encode(hash('sha256', $bodyJson, true));
             $signedHeaders = '(request-target) host date digest v-c-merchant-id';
-            $signatureString = "(request-target): {$methodLower} {$path}\n" .
+            $signatureString = "(request-target): {$methodLower} {$cleanPath}\n" .
                 "host: {$host}\n" .
                 "date: {$dateStr}\n" .
                 "digest: {$digest}\n" .
@@ -62,7 +66,7 @@ class AtcSignatureService
         } else {
             $digest = null;
             $signedHeaders = '(request-target) host date v-c-merchant-id';
-            $signatureString = "(request-target): {$methodLower} {$path}\n" .
+            $signatureString = "(request-target): {$methodLower} {$cleanPath}\n" .
                 "host: {$host}\n" .
                 "date: {$dateStr}\n" .
                 "v-c-merchant-id: {$merchantId}";
@@ -102,9 +106,11 @@ class AtcSignatureService
     public static function request(Foundation $tenant, string $method, string $path, ?array $payload = null): array
     {
         $host = self::getHost($tenant);
-        $url = "https://{$host}{$path}";
+        $cleanPath = '/' . ltrim($path, '/');
+        $url = "https://{$host}{$cleanPath}";
+
         $bodyJson = $payload ? json_encode($payload, JSON_UNESCAPED_SLASHES) : null;
-        $headers = self::generateAuthHeaders($tenant, $method, $path, $bodyJson);
+        $headers = self::generateAuthHeaders($tenant, $method, $cleanPath, $bodyJson);
 
         $connectTimeout = 10;
         $timeoutSeconds = 30;
@@ -126,9 +132,10 @@ class AtcSignatureService
         if (!$response->successful()) {
             $statusCode = $response->status();
             $rawBody = $response->body();
-            Log::error("Cybersource Error [{$statusCode}] en {$path}: {$rawBody}", [
+            Log::error("Cybersource Error [{$statusCode}] en {$cleanPath}: {$rawBody}", [
                 'tenant_id' => $tenant->id,
                 'tenant'    => $tenant->name,
+                'url'       => $url,
                 'payload'   => $payload,
             ]);
             $errorMessage = $result['message'] ?? ($result['errorInformation']['message'] ?? ($result['reason'] ?? $rawBody));
