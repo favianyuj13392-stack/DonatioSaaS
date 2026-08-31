@@ -29,10 +29,10 @@ return new class extends Migration
             $table->decimal('atc_fee_card_est', 5, 2)->default(2.45)->comment('Estimado ATC tarjetas (%)');
             $table->decimal('atc_fee_qr_est', 5, 2)->default(1.00)->comment('Estimado ATC QR (%)');
 
-            // Credenciales Bancarias ATC Red Enlace (Cifradas con AES-256 en Eloquent)
-            $table->text('atc_merchant_id');
-            $table->text('atc_api_key_id');
-            $table->text('atc_secret_key');
+            // Credenciales Bancarias ATC Red Enlace (Cifradas con AES-256 en Eloquent, Nullable para fallback Sandbox)
+            $table->text('atc_merchant_id')->nullable();
+            $table->text('atc_api_key_id')->nullable();
+            $table->text('atc_secret_key')->nullable();
             $table->text('atc_org_unit_id')->nullable();
             $table->boolean('is_sandbox')->default(true);
 
