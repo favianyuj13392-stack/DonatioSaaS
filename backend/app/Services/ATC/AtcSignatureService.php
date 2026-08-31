@@ -14,7 +14,14 @@ class AtcSignatureService
      */
     public static function getHost(Foundation $tenant): string
     {
-        if ($tenant->is_sandbox) {
+        $rawKeyId   = (string) ($tenant->atc_api_key_id ?? '');
+        $isDummyKey = empty($rawKeyId) 
+            || str_starts_with($rawKeyId, 'key_') 
+            || str_starts_with($rawKeyId, 'test_') 
+            || str_starts_with($rawKeyId, 'sec_')
+            || strlen($rawKeyId) < 10;
+
+        if ($tenant->is_sandbox || $isDummyKey) {
             $configuredBase = config('services.atc.base_url', 'https://apitest.cybersource.com');
             $parsed = parse_url($configuredBase);
             return $parsed['host'] ?? 'apitest.cybersource.com';

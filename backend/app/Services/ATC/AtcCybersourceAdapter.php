@@ -17,7 +17,7 @@ class AtcCybersourceAdapter implements PaymentGatewayInterface
     public function setup3ds(Foundation $tenant, array $payload): array
     {
         $referenceCode = $payload['merchant_reference_number'] ?? ('REF-' . $tenant->code . '-' . time());
-        return Atc3dsService::setupSession($tenant, $referenceCode, $payload);
+        return Atc3dsService::setupSession($tenant, $referenceCode);
     }
 
     /**
