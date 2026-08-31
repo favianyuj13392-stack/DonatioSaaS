@@ -112,6 +112,13 @@ class AtcSignatureService
         $bodyJson = $payload ? json_encode($payload, JSON_UNESCAPED_SLASHES) : null;
         $headers = self::generateAuthHeaders($tenant, $method, $cleanPath, $bodyJson);
 
+        Log::info("[Cybersource Outgoing Request] {$method} {$url}", [
+            'tenant_id' => $tenant->id,
+            'cleanPath' => $cleanPath,
+            'host'      => $host,
+            'headers'   => array_diff_key($headers, ['Signature' => '']),
+        ]);
+
         $connectTimeout = 10;
         $timeoutSeconds = 30;
 
