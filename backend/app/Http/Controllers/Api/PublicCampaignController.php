@@ -105,9 +105,10 @@ class PublicCampaignController extends Controller
                     'progress_percentage' => $c->progress_percentage,
                 ]);
 
-            // Proveedores y métodos de pago activos
+            // Proveedores y métodos de pago activos (Permitidos en Sandbox con fallback o con llaves cargadas)
             $paymentProviders = [];
-            if (!empty($tenant->atc_merchant_id) && !empty($tenant->atc_api_key_id)) {
+            $hasPaymentConfig = $tenant->is_sandbox || (!empty($tenant->atc_merchant_id) && !empty($tenant->atc_api_key_id));
+            if ($hasPaymentConfig) {
                 if ($campaign->allowed_payment_methods === 'all' || $campaign->allowed_payment_methods === 'card_only') {
                     $paymentProviders[] = [
                         'id'        => 'card',
