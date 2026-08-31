@@ -13,7 +13,7 @@ class Atc3dsService
      * Paso 1: Setup Service (/risk/v1/authentication-setups)
      * Inicia la sesión 3DS2 con Cybersource para obtener el JWT token real de Cardinal Cruise.
      */
-    public static function setupSession(Foundation $tenant, string $referenceCode): array
+    public static function setupSession(Foundation $tenant, string $referenceCode, ?array $cardData = null): array
     {
         $path = '/risk/v1/authentication-setups';
         $payload = [
@@ -21,6 +21,20 @@ class Atc3dsService
                 'code' => $referenceCode,
             ],
         ];
+
+        $cardNumber = $cardData['card_number'] ?? ($cardData['cardNumber'] ?? null);
+        $expMonth   = $cardData['expiration_month'] ?? ($cardData['expirationMonth'] ?? null);
+        $expYear    = $cardData['expiration_year'] ?? ($cardData['expirationYear'] ?? null);
+
+        if ($cardNumber && $expMonth && $expYear) {
+            $payload['paymentInformation'] = [
+                'card' => [
+                    'number'          => (string) $cardNumber,
+                    'expirationMonth' => str_pad((string) $expMonth, 2, '0', STR_PAD_LEFT),
+                    'expirationYear'  => (string) $expYear,
+                ],
+            ];
+        }
 
         $response = AtcSignatureService::request($tenant, 'POST', $path, $payload);
         $authInfo = $response['consumerAuthenticationInformation'] ?? [];

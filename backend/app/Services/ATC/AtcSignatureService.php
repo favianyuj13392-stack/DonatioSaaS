@@ -89,7 +89,6 @@ class AtcSignatureService
             'Host'            => $host,
             'Signature'       => $signatureHeader,
             'Content-Type'    => 'application/json',
-            'Accept'          => 'application/json',
         ];
 
         if ($digest) {
