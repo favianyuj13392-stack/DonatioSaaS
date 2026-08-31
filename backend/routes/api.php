@@ -25,7 +25,6 @@ Route::prefix('v1')->group(function () {
             Route::get('/public/tenants/{subdomain}/campaigns', [PublicCampaignController::class, 'index']);
             Route::get('/public/tenants/{subdomain}/campaigns/{slug}', [PublicCampaignController::class, 'show']);
             Route::get('/donations/{id}/qr-status', [DonationCheckoutController::class, 'qrStatus']);
-            Route::get('/donations/{id}/receipt', [DonationCheckoutController::class, 'downloadReceipt'])->name('donations.receipt');
         });
 
         // Transacciones y Flujo Completo 3DS2 Cybersource ATC (Protección Estricta Anti-Carding & Brute Force)
@@ -42,13 +41,18 @@ Route::prefix('v1')->group(function () {
             ->middleware(['throttle:30,1']);
     });
 
-    // 2. Rutas de Reactivación de Socios (Reactivación 1-Click con Token UUID 72h)
+    // 2. Rutas Públicas de Recibos y Comprobantes de Donación (Sin dependencia de subdominio)
+    Route::middleware(['throttle:60,1'])->group(function () {
+        Route::get('/donations/{id}/receipt', [DonationCheckoutController::class, 'downloadReceipt'])->name('donations.receipt');
+    });
+
+    // 3. Rutas de Reactivación de Socios (Reactivación 1-Click con Token UUID 72h)
     Route::prefix('public/subscriptions')->middleware(['throttle:30,1'])->group(function () {
         Route::get('/validate-reactivation/{token}', [SubscriptionReactivationController::class, 'validate']);
         Route::post('/confirm-reactivation/{token}', [SubscriptionReactivationController::class, 'confirm']);
     });
 
-    // 3. Webhooks Globales Multitenant de Pasarelas de Pago
+    // 4. Webhooks Globales Multitenant de Pasarelas de Pago
     Route::prefix('webhooks')->middleware(['throttle:120,1'])->group(function () {
         Route::post('/qr-payment', [QrWebhookController::class, 'handle']);
     });

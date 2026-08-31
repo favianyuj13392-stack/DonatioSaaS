@@ -28,6 +28,11 @@ class AppServiceProvider extends ServiceProvider
         Model::preventLazyLoading(!app()->isProduction());
         Model::shouldBeStrict(!app()->isProduction());
 
+        // Forzar esquema HTTPS en producción o cuando APP_URL es HTTPS
+        if (app()->isProduction() || str_starts_with((string) config('app.url'), 'https://') || isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') {
+            \Illuminate\Support\Facades\URL::forceScheme('https');
+        }
+
         // Registro de Observers para sincronización y purga de caché
         Campaign::observe(CampaignObserver::class);
         Foundation::observe(FoundationObserver::class);
