@@ -20,6 +20,11 @@ class ExchangeRateResource extends Resource
     protected static ?string $pluralModelLabel = 'Histórico Tipos de Cambio BCB';
     protected static ?int $navigationSort = 5;
 
+    public static function canViewAny(): bool
+    {
+        return auth()->check() && auth()->user()->isSuperAdmin();
+    }
+
     public static function form(Form $form): Form
     {
         return $form

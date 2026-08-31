@@ -23,6 +23,25 @@ class FoundationResource extends Resource
     protected static ?string $pluralModelLabel = 'Fundaciones';
     protected static ?int $navigationSort = 1;
 
+    public static function getEloquentQuery(): \Illuminate\Database\Eloquent\Builder
+    {
+        $query = parent::getEloquentQuery();
+        if (auth()->check() && !auth()->user()->isSuperAdmin()) {
+            $query->where('id', auth()->user()->foundation_id);
+        }
+        return $query;
+    }
+
+    public static function canCreate(): bool
+    {
+        return auth()->check() && auth()->user()->isSuperAdmin();
+    }
+
+    public static function canDelete(\Illuminate\Database\Eloquent\Model $record): bool
+    {
+        return auth()->check() && auth()->user()->isSuperAdmin();
+    }
+
     public static function form(Form $form): Form
     {
         return $form

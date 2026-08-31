@@ -151,5 +151,16 @@ class VidaYFuturoSeeder extends Seeder
                 'status'                 => 'active',
             ]
         );
+
+        // Usuario Administrador de Fundación Vida y Futuro
+        User::updateOrCreate(
+            ['email' => 'admin@vfuturo.org'],
+            [
+                'name'          => 'Admin Vida y Futuro',
+                'password'      => 'password',
+                'foundation_id' => $foundation->id,
+                'role'          => 'foundation_admin',
+            ]
+        );
     }
 }

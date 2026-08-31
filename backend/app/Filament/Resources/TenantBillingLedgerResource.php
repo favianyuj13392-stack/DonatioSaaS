@@ -22,6 +22,11 @@ class TenantBillingLedgerResource extends Resource
     protected static ?string $pluralModelLabel = 'Facturación & Liquidaciones';
     protected static ?int $navigationSort = 4;
 
+    public static function canViewAny(): bool
+    {
+        return auth()->check() && auth()->user()->isSuperAdmin();
+    }
+
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()

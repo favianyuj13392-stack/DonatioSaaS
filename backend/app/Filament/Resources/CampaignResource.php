@@ -25,6 +25,15 @@ class CampaignResource extends Resource
     protected static ?string $pluralModelLabel = 'Campañas';
     protected static ?int $navigationSort = 1;
 
+    public static function getEloquentQuery(): \Illuminate\Database\Eloquent\Builder
+    {
+        $query = parent::getEloquentQuery();
+        if (auth()->check() && !auth()->user()->isSuperAdmin()) {
+            $query->where('foundation_id', auth()->user()->foundation_id);
+        }
+        return $query;
+    }
+
     public static function form(Form $form): Form
     {
         return $form
@@ -39,7 +48,8 @@ class CampaignResource extends Resource
                                     ->label('Fundación Propietaria')
                                     ->relationship('foundation', 'name')
                                     ->required()
-                                    ->default(1)
+                                    ->default(fn () => auth()->user()?->foundation_id ?? 1)
+                                    ->visible(fn () => auth()->user()?->isSuperAdmin() ?? true)
                                     ->columnSpan(2),
 
                                 Forms\Components\TextInput::make('title')

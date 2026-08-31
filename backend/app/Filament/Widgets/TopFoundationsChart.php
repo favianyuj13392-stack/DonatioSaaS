@@ -12,6 +12,11 @@ class TopFoundationsChart extends ChartWidget
     protected static ?int $sort = 3;
     protected int | string | array $columnSpan = 'full';
 
+    public static function canView(): bool
+    {
+        return auth()->check() && auth()->user()->isSuperAdmin();
+    }
+
     protected function getData(): array
     {
         $currentMonth = now()->startOfMonth();

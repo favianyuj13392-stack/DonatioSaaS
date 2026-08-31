@@ -34,9 +34,23 @@ class User extends Authenticatable implements FilamentUser
         ];
     }
 
+    public function isSuperAdmin(): bool
+    {
+        return $this->role === 'superadmin' || empty($this->foundation_id);
+    }
+
+    public function isFoundationAdmin(): bool
+    {
+        return $this->role === 'foundation_admin' || (!empty($this->foundation_id) && $this->role !== 'superadmin');
+    }
+
     public function canAccessPanel(Panel $panel): bool
     {
-        return true;
+        if ($this->isSuperAdmin()) {
+            return true;
+        }
+
+        return $this->foundation && $this->foundation->status === 'active';
     }
 
     public function foundation()

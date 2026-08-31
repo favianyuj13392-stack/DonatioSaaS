@@ -19,6 +19,15 @@ class DonationResource extends Resource
     protected static ?string $pluralModelLabel = 'Transacciones Live';
     protected static ?int $navigationSort = 2;
 
+    public static function getEloquentQuery(): \Illuminate\Database\Eloquent\Builder
+    {
+        $query = parent::getEloquentQuery();
+        if (auth()->check() && !auth()->user()->isSuperAdmin()) {
+            $query->where('foundation_id', auth()->user()->foundation_id);
+        }
+        return $query;
+    }
+
     public static function table(Table $table): Table
     {
         return $table

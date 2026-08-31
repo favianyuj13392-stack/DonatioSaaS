@@ -28,6 +28,53 @@ class FinancialStatsOverview extends BaseWidget
         $buyRate = $latestRate ? (float) $latestRate->buy_rate : 11.83;
         $rateSource = $latestRate ? $latestRate->source : 'BCB_CUCU';
 
+        $isSuperAdmin = auth()->check() && auth()->user()->isSuperAdmin();
+        $foundationId = auth()->user()?->foundation_id;
+
+        if (!$isSuperAdmin && $foundationId) {
+            $foundation = auth()->user()->foundation;
+
+            $totalReceivedBob = (float) Donation::where('foundation_id', $foundationId)
+                ->where('status', 'completed')
+                ->where('paid_at', '>=', $currentMonth)
+                ->sum('net_estimated_to_foundation');
+
+            $totalDonationsCount = Donation::where('foundation_id', $foundationId)
+                ->where('status', 'completed')
+                ->where('paid_at', '>=', $currentMonth)
+                ->count();
+
+            $activeSubscribers = Subscription::where('foundation_id', $foundationId)
+                ->where('status', 'active')
+                ->count();
+
+            $activeCampaigns = \App\Models\Campaign::where('foundation_id', $foundationId)
+                ->where('status', 'active')
+                ->count();
+
+            return [
+                Stat::make('Recaudación Neta Mes', 'Bs. ' . number_format($totalReceivedBob, 2))
+                    ->description("Fondos transferibles a {$foundation?->name}")
+                    ->descriptionIcon('heroicon-m-banknotes')
+                    ->color('success'),
+
+                Stat::make('Donaciones Exitosas', number_format($totalDonationsCount))
+                    ->description('Aportes procesados este mes')
+                    ->descriptionIcon('heroicon-m-heart')
+                    ->color('primary'),
+
+                Stat::make('Socios Mensuales Activos', number_format($activeSubscribers))
+                    ->description('Padrinos con débito automático TMS')
+                    ->descriptionIcon('heroicon-m-user-group')
+                    ->color('info'),
+
+                Stat::make('Campañas Activas', number_format($activeCampaigns))
+                    ->description('Causas vigentes en la plataforma')
+                    ->descriptionIcon('heroicon-m-megaphone')
+                    ->color('warning'),
+            ];
+        }
+
         // 1. GMV Total del Mes (Agrupado por moneda)
         $bobGmv = (float) Donation::where('status', 'completed')
             ->where('currency', 'BOB')

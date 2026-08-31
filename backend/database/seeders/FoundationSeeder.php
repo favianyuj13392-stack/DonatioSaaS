@@ -170,9 +170,20 @@ class FoundationSeeder extends Seeder
             ['email' => 'admin@donatio.lat'],
             [
                 'name'          => 'Superadmin Donatio',
-                'password'      => 'password', // Hasheado automáticamente por Eloquent cast
+                'password'      => 'password',
                 'foundation_id' => null,
                 'role'          => 'superadmin',
+            ]
+        );
+
+        // 5. Usuario Administrador de Fundación Nuestra Esperanza
+        User::updateOrCreate(
+            ['email' => 'admin@fundacionesperanza.org'],
+            [
+                'name'          => 'Admin Nuestra Esperanza',
+                'password'      => 'password',
+                'foundation_id' => $foundation->id,
+                'role'          => 'foundation_admin',
             ]
         );
     }

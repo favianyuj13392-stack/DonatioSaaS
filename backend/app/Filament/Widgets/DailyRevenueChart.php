@@ -9,9 +9,12 @@ use Filament\Widgets\ChartWidget;
 
 class DailyRevenueChart extends ChartWidget
 {
-    protected static ?string $heading = '📈 Recaudación Diaria Global vs. Comisión SaaS (Últimos 30 Días)';
-    protected static ?int $sort = 2;
-    protected int | string | array $columnSpan = 'full';
+    public function getHeading(): ?string
+    {
+        return (auth()->check() && !auth()->user()->isSuperAdmin())
+            ? '📈 Recaudación Diaria de tu Fundación (Últimos 30 Días)'
+            : '📈 Recaudación Diaria Global vs. Comisión SaaS (Últimos 30 Días)';
+    }
 
     protected function getData(): array
     {
@@ -19,13 +22,18 @@ class DailyRevenueChart extends ChartWidget
             return now()->subDays($dayOffset)->format('Y-m-d');
         });
 
-        $donations = Donation::withoutGlobalScopes()
+        $query = Donation::withoutGlobalScopes()
             ->where('status', 'completed')
             ->where(function ($q) {
                 $q->where('paid_at', '>=', now()->subDays(30)->startOfDay())
                   ->orWhere('created_at', '>=', now()->subDays(30)->startOfDay());
-            })
-            ->get();
+            });
+
+        if (auth()->check() && !auth()->user()->isSuperAdmin()) {
+            $query->where('foundation_id', auth()->user()->foundation_id);
+        }
+
+        $donations = $query->get();
 
         $rateService = app(ExchangeRateService::class);
         $latestRate = $rateService->getLatestConfirmedRate('USD/BOB');
@@ -48,27 +56,51 @@ class DailyRevenueChart extends ChartWidget
                 return $d->currency === 'USD' ? ((float) $d->saas_fee_amount * $exchangeRate) : (float) $d->saas_fee_amount;
             });
 
+            $net = $dayDonations->sum(function ($d) use ($exchangeRate) {
+                return $d->currency === 'USD' ? ((float) $d->net_estimated_to_foundation * $exchangeRate) : (float) $d->net_estimated_to_foundation;
+            });
+
             $dailyGmv[] = round($gmv, 2);
             $dailySaasFee[] = round($saas, 2);
+            $dailyNet[] = round($net, 2);
         }
 
-        return [
-            'datasets' => [
-                [
-                    'label'           => 'GMV Global Donado (BOB)',
-                    'data'            => $dailyGmv,
-                    'borderColor'     => '#2563eb',
-                    'backgroundColor' => 'rgba(37, 99, 235, 0.1)',
-                    'fill'            => true,
-                ],
-                [
-                    'label'           => 'Comisión SaaS (BOB)',
-                    'data'            => $dailySaasFee,
-                    'borderColor'     => '#db2777',
-                    'backgroundColor' => 'rgba(219, 39, 119, 0.2)',
-                    'fill'            => false,
-                ],
+        $isSuperAdmin = auth()->check() && auth()->user()->isSuperAdmin();
+
+        $datasets = $isSuperAdmin ? [
+            [
+                'label'           => 'GMV Global Donado (BOB)',
+                'data'            => $dailyGmv,
+                'borderColor'     => '#2563eb',
+                'backgroundColor' => 'rgba(37, 99, 235, 0.1)',
+                'fill'            => true,
             ],
+            [
+                'label'           => 'Comisión SaaS (BOB)',
+                'data'            => $dailySaasFee,
+                'borderColor'     => '#db2777',
+                'backgroundColor' => 'rgba(219, 39, 119, 0.2)',
+                'fill'            => false,
+            ],
+        ] : [
+            [
+                'label'           => 'Total Donado Bruto (BOB)',
+                'data'            => $dailyGmv,
+                'borderColor'     => '#2563eb',
+                'backgroundColor' => 'rgba(37, 99, 235, 0.1)',
+                'fill'            => true,
+            ],
+            [
+                'label'           => 'Neto Recibido por Fundación (BOB)',
+                'data'            => $dailyNet,
+                'borderColor'     => '#10b981',
+                'backgroundColor' => 'rgba(16, 185, 129, 0.2)',
+                'fill'            => false,
+            ],
+        ];
+
+        return [
+            'datasets' => $datasets,
             'labels'   => $days->map(fn ($d) => Carbon::parse($d)->format('d/m'))->toArray(),
         ];
     }
