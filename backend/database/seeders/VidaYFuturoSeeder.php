@@ -59,11 +59,11 @@ class VidaYFuturoSeeder extends Seeder
                 'corporate_partners'    => [
                     ['name' => 'WWF Bolivia', 'logo_url' => 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=200&q=80', 'website_url' => 'https://www.wwf.org.bo'],
                     ['name' => 'The Nature Conservancy', 'logo_url' => 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&w=200&q=80', 'website_url' => 'https://www.nature.org'],
-                    ['name' => 'CAF', 'logo_url' => 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?auto=format&fit=crop&w=200&q=80', 'website_url' => 'https://www.caf.com'],
-                ],
-                'atc_merchant_id'       => 'redenlace_vfuturo',
-                'atc_api_key_id'        => 'key_vfuturo_test',
-                'atc_secret_key'        => 'secret_vfuturo_test',
+                // Credenciales ATC Enlace Sandbox (Null para activar fallback global certificado config('services.atc'))
+                'atc_merchant_id'       => null,
+                'atc_api_key_id'        => null,
+                'atc_secret_key'        => null,
+                'atc_org_unit_id'       => null,
                 'is_sandbox'            => true,
                 'status'                => 'active',
             ]

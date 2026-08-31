@@ -237,25 +237,32 @@ class FoundationResource extends Resource
                                     ->label('Merchant ID (Código de Comercio ATC)')
                                     ->password()
                                     ->revealable()
-                                    ->required(),
+                                    ->nullable()
+                                    ->placeholder('Dejar vacío para usar credenciales globales de Sandbox')
+                                    ->helperText('En Sandbox, dejar en blanco para usar la cuenta compartida de ATC Red Enlace (redenlace_000021).'),
 
                                 Forms\Components\TextInput::make('atc_api_key_id')
                                     ->label('API Key ID (Cybersource Key)')
                                     ->password()
                                     ->revealable()
-                                    ->required(),
+                                    ->nullable()
+                                    ->placeholder('Dejar vacío para usar credenciales globales de Sandbox')
+                                    ->helperText('Identificador de la llave API generado en Cybersource Business Center.'),
 
                                 Forms\Components\TextInput::make('atc_secret_key')
                                     ->label('Shared Secret Key (HMAC Base64)')
                                     ->password()
                                     ->revealable()
-                                    ->required(),
+                                    ->nullable()
+                                    ->placeholder('Dejar vacío para usar credenciales globales de Sandbox')
+                                    ->helperText('Llave secreta HMAC-SHA256 en Base64 (Cifrada de forma inmutable con AES-256).'),
 
                                 Forms\Components\TextInput::make('atc_org_unit_id')
                                     ->label('Org Unit ID (3DS2 Cardinal Cruise)')
                                     ->password()
                                     ->revealable()
-                                    ->nullable(),
+                                    ->nullable()
+                                    ->helperText('Identificador de unidad organizacional para Cardinal Cruise 3DS2 (Opcional).'),
                             ]),
                     ])
                     ->columnSpanFull(),

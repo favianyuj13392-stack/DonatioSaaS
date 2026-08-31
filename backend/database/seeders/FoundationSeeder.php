@@ -54,11 +54,11 @@ class FoundationSeeder extends Seeder
                         'website_url' => 'https://www.bago.com.bo',
                     ],
                 ],
-                // Credenciales ATC Enlace Sandbox (Cifrado automático AES-256 en Foundation Model)
-                'atc_merchant_id'       => 'test_merchant_esperanza',
-                'atc_api_key_id'        => 'test_key_esperanza_123',
-                'atc_secret_key'        => 'test_secret_esperanza_456',
-                'atc_org_unit_id'       => 'org_unit_test_123',
+                // Credenciales ATC Enlace Sandbox (Null para activar fallback global certificado config('services.atc'))
+                'atc_merchant_id'       => null,
+                'atc_api_key_id'        => null,
+                'atc_secret_key'        => null,
+                'atc_org_unit_id'       => null,
                 'is_sandbox'            => true,
                 'status'                => 'active',
             ]

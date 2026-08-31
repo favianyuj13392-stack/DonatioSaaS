@@ -24,15 +24,23 @@ class AtcSignatureService
     }
 
     /**
-     * Construye las cabeceras HTTP autenticadas con firma HMAC-SHA256 para el tenant con fallback seguro.
+     * Construye las cabeceras HTTP autenticadas con firma HMAC-SHA256 para el tenant con fallback inteligente.
      */
     public static function generateAuthHeaders(Foundation $tenant, string $method, string $path, ?string $bodyJson = null): array
     {
-        $host       = self::getHost($tenant);
-        $dateStr    = gmdate('D, d M Y H:i:s GMT');
-        $merchantId = !empty($tenant->atc_merchant_id) ? (string) $tenant->atc_merchant_id : config('services.atc.merchant_id', 'redenlace_000021');
-        $apiKeyId   = !empty($tenant->atc_api_key_id) ? (string) $tenant->atc_api_key_id : config('services.atc.key_id', '3ada8327-76bd-4ed9-9952-0e8288f6e212');
-        $secretKey  = !empty($tenant->atc_secret_key) ? (string) $tenant->atc_secret_key : config('services.atc.secret_key', '/zFZFhYflXW/P3BMzkULTcIuJhdcXCVD9SKJEo+fJXo=');
+        $host    = self::getHost($tenant);
+        $dateStr = gmdate('D, d M Y H:i:s GMT');
+
+        $rawKeyId   = (string) ($tenant->atc_api_key_id ?? '');
+        $isDummyKey = empty($rawKeyId) 
+            || str_starts_with($rawKeyId, 'key_') 
+            || str_starts_with($rawKeyId, 'test_') 
+            || str_starts_with($rawKeyId, 'sec_')
+            || strlen($rawKeyId) < 10;
+
+        $merchantId = (!$isDummyKey && !empty($tenant->atc_merchant_id)) ? (string) $tenant->atc_merchant_id : config('services.atc.merchant_id', 'redenlace_000021');
+        $apiKeyId   = (!$isDummyKey && !empty($tenant->atc_api_key_id))   ? (string) $tenant->atc_api_key_id   : config('services.atc.key_id', '3ada8327-76bd-4ed9-9952-0e8288f6e212');
+        $secretKey  = (!$isDummyKey && !empty($tenant->atc_secret_key))  ? (string) $tenant->atc_secret_key  : config('services.atc.secret_key', '/zFZFhYflXW/P3BMzkULTcIuJhdcXCVD9SKJEo+fJXo=');
 
         $methodLower = strtolower($method);
 
