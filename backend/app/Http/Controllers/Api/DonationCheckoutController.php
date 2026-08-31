@@ -290,38 +290,31 @@ class DonationCheckoutController extends Controller
 
         try {
             return DB::transaction(function () use ($validated, $tenant, $donor, $gateway, $isAnonymous, $request) {
-                $subscription = null;
-                $paymentInstrumentId = null;
+                // 1. Procesar captura en Cybersource (/pts/v2/payments) con TOKEN_CREATE automático si es recurrente
+                $paymentResult = $gateway->processCheckout($tenant, $validated);
+
+                if (($paymentResult['status'] ?? '') !== 'completed') {
+                    throw new Exception('El banco rechazó la transacción de pago.');
+                }
+
+                $rawResponse = $paymentResult['raw_gateway_response'] ?? [];
+                $tokenInfo = $rawResponse['tokenInformation'] ?? [];
+                $paymentInstrumentId = $tokenInfo['instrumentIdentifier']['id'] ?? ($tokenInfo['paymentInstrument']['id'] ?? null);
+                $customerId = $tokenInfo['customer']['id'] ?? null;
                 $cardLastFour = substr($validated['card_number'] ?? '0000', -4);
-                $cardBrand = 'VISA';
+                $cardBrand = strtoupper($validated['card_type'] ?? 'VISA');
 
-                // 2. Si es suscripción mensual, tokenizar tarjeta en TMS
+                $subscription = null;
+
+                // 2. Si es recurrente, crear la Suscripción con el token TMS retornado por Cybersource
                 if ($validated['frequency'] === 'monthly') {
-                    $tokenData = $gateway->tokenizeCard($tenant, [
-                        'card_number'      => $validated['card_number'],
-                        'expiration_month' => $validated['expiration_month'],
-                        'expiration_year'  => $validated['expiration_year'],
-                        'cvv'              => $validated['cvv'] ?? null,
-                        'donor_name'       => $validated['donor_name'] ?? 'Socio',
-                        'donor_email'      => $validated['donor_email'] ?? 'socio@donatio.lat',
-                        'country'          => $validated['country'] ?? 'BO',
-                        'state'            => $validated['state'] ?? 'L',
-                        'locality'         => $validated['locality'] ?? 'La Paz',
-                        'address1'         => $validated['address1'] ?? 'Av. Principal 123',
-                        'postal_code'      => $validated['postal_code'] ?? '0000',
-                    ]);
-
-                    $paymentInstrumentId = $tokenData['payment_instrument_id'];
-                    $cardLastFour = $tokenData['card_last_four'];
-                    $cardBrand = $tokenData['card_brand'];
-
                     $subscription = Subscription::create([
                         'foundation_id'             => $tenant->id,
                         'donor_id'                  => $donor?->id,
                         'campaign_id'               => $validated['campaign_id'] ?? null,
                         'amount'                    => $validated['amount'],
                         'currency'                  => $validated['currency'] ?? 'BOB',
-                        'tms_customer_id'           => $tokenData['customer_id'] ?? null,
+                        'tms_customer_id'           => $customerId,
                         'tms_payment_instrument_id' => $paymentInstrumentId,
                         'card_last_four'            => $cardLastFour,
                         'card_brand'                => $cardBrand,
@@ -333,15 +326,6 @@ class DonationCheckoutController extends Controller
                         'accepted_terms_at'         => now(),
                         'status'                    => 'active',
                     ]);
-                }
-
-                // 3. Procesar captura en Cybersource
-                $paymentResult = $gateway->processCheckout($tenant, array_merge($validated, [
-                    'tms_payment_instrument_id' => $paymentInstrumentId,
-                ]));
-
-                if (($paymentResult['status'] ?? '') !== 'completed') {
-                    throw new Exception('El banco rechazó la transacción de pago.');
                 }
 
                 // 4. Calcular comisiones inmutables del tenant
