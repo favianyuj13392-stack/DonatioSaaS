@@ -44,16 +44,6 @@ class AtcCybersourceAdapter implements PaymentGatewayInterface
     {
         $path = '/tms/v2/tokens';
 
-        // Fast-path en entorno Sandbox para ejecución instantánea
-        if ($tenant->is_sandbox) {
-            return [
-                'payment_instrument_id' => 'tms_token_' . Str::random(24),
-                'customer_id'           => null,
-                'card_last_four'        => substr($cardData['card_number'], -4),
-                'card_brand'            => 'VISA',
-            ];
-        }
-
         $payload = [
             'paymentInformation' => [
                 'card' => [
@@ -68,28 +58,14 @@ class AtcCybersourceAdapter implements PaymentGatewayInterface
             ],
         ];
 
-        try {
-            $response = AtcSignatureService::request($tenant, 'POST', $path, $payload);
-            return [
-                'payment_instrument_id' => $response['id'] ?? ($response['paymentInstrument']['id'] ?? null),
-                'customer_id'           => $response['customer']['id'] ?? null,
-                'card_last_four'        => $response['paymentInformation']['card']['suffix'] ?? substr($cardData['card_number'], -4),
-                'card_brand'            => $response['paymentInformation']['card']['brandName'] ?? 'VISA',
-            ];
-        } catch (Exception $e) {
-            Log::warning("TMS tokenizeCard: " . $e->getMessage());
+        $response = AtcSignatureService::request($tenant, 'POST', $path, $payload);
 
-            if ($tenant->is_sandbox) {
-                return [
-                    'payment_instrument_id' => 'tms_token_' . Str::random(24),
-                    'customer_id'           => null,
-                    'card_last_four'        => substr($cardData['card_number'], -4),
-                    'card_brand'            => 'VISA',
-                ];
-            }
-
-            throw $e;
-        }
+        return [
+            'payment_instrument_id' => $response['id'] ?? ($response['paymentInstrument']['id'] ?? null),
+            'customer_id'           => $response['customer']['id'] ?? null,
+            'card_last_four'        => $response['paymentInformation']['card']['suffix'] ?? substr($cardData['card_number'], -4),
+            'card_brand'            => $response['paymentInformation']['card']['brandName'] ?? 'VISA',
+        ];
     }
 
     /**
@@ -99,7 +75,7 @@ class AtcCybersourceAdapter implements PaymentGatewayInterface
     public function processCheckout(Foundation $tenant, array $data): array
     {
         $path = '/pts/v2/payments';
-        $referenceNo = $data['merchant_reference_number'] ?? ('ATC-REF-' . strtoupper(Str::random(10)));
+        $referenceNo = $data['merchant_reference_number'] ?? ($data['merchantReferenceNumber'] ?? ('ATC-REF-' . strtoupper(Str::random(10))));
         $isRecurring = !empty($data['is_recurring']) || ($data['frequency'] ?? '') === 'monthly';
 
         $cardNum = $data['card_number'] ?? '';
@@ -150,9 +126,12 @@ class AtcCybersourceAdapter implements PaymentGatewayInterface
         $consumerAuth = array_filter($consumerAuth, fn($v) => !is_null($v) && $v !== '');
 
         $rawSessionId = $data['fingerprint_session_id'] ?? ($data['fingerprintSessionId'] ?? null);
-        $merchantId = (string) $tenant->atc_merchant_id;
+        $merchantId = (string) ($tenant->atc_merchant_id ?: config('services.atc.merchant_id', 'redenlace_000021'));
         if ($rawSessionId && !empty($merchantId) && str_starts_with($rawSessionId, $merchantId)) {
             $rawSessionId = substr($rawSessionId, strlen($merchantId));
+        }
+        if ($rawSessionId) {
+            $rawSessionId = ltrim($rawSessionId, '_');
         }
 
         $payload = [
@@ -201,57 +180,18 @@ class AtcCybersourceAdapter implements PaymentGatewayInterface
             unset($payload['paymentInformation']['card']);
         }
 
-        // Fast-path en entorno Sandbox con credenciales de prueba para ejecución instantánea
-        if ($tenant->is_sandbox) {
-            $mockRequestId = '66' . mt_rand(1000000000, 9999999999) . mt_rand(1000000000, 9999999999);
-            return [
-                'status'                    => 'completed',
-                'gateway_transaction_id'    => 'tx_sb_' . Str::random(16),
-                'cybersource_request_id'    => $mockRequestId,
-                'merchant_reference_number' => $referenceNo,
-                'eci_raw'                   => $eci,
-                'cavv_raw'                  => $data['cavv'] ?? 'AAABBBCCC111222333==',
-                'raw_gateway_response'      => [
-                    'id'     => $mockRequestId,
-                    'status' => 'AUTHORIZED',
-                    'mock'   => true,
-                ],
-            ];
-        }
+        $response = AtcSignatureService::request($tenant, 'POST', $path, $payload);
+        $status = $response['status'] ?? 'FAILED';
 
-        try {
-            $response = AtcSignatureService::request($tenant, 'POST', $path, $payload);
-            return [
-                'status'                    => ($response['status'] ?? '') === 'AUTHORIZED' ? 'completed' : 'failed',
-                'gateway_transaction_id'    => $response['id'] ?? null,
-                'cybersource_request_id'    => $response['id'] ?? null,
-                'merchant_reference_number' => $referenceNo,
-                'eci_raw'                   => $eci,
-                'cavv_raw'                  => $data['cavv'] ?? null,
-                'raw_gateway_response'      => $response,
-            ];
-        } catch (Exception $e) {
-            Log::warning("Cybersource processCheckout: " . $e->getMessage());
-
-            if ($tenant->is_sandbox) {
-                $mockRequestId = '66' . mt_rand(1000000000, 9999999999) . mt_rand(1000000000, 9999999999);
-                return [
-                    'status'                    => 'completed',
-                    'gateway_transaction_id'    => 'tx_sb_' . Str::random(16),
-                    'cybersource_request_id'    => $mockRequestId,
-                    'merchant_reference_number' => $referenceNo,
-                    'eci_raw'                   => $eci,
-                    'cavv_raw'                  => 'AAABBBCCC111222333==',
-                    'raw_gateway_response'      => [
-                        'id'     => $mockRequestId,
-                        'status' => 'AUTHORIZED',
-                        'mock'   => true,
-                    ],
-                ];
-            }
-
-            throw $e;
-        }
+        return [
+            'status'                    => $status === 'AUTHORIZED' ? 'completed' : 'failed',
+            'gateway_transaction_id'    => $response['id'] ?? null,
+            'cybersource_request_id'    => $response['id'] ?? null,
+            'merchant_reference_number' => $referenceNo,
+            'eci_raw'                   => $eci,
+            'cavv_raw'                  => $data['cavv'] ?? null,
+            'raw_gateway_response'      => $response,
+        ];
     }
 
     /**
@@ -295,47 +235,30 @@ class AtcCybersourceAdapter implements PaymentGatewayInterface
             ],
         ];
 
-        // Fast-path Sandbox
-        if ($tenant->is_sandbox) {
-            $mockRequestId = '66' . mt_rand(1000000000, 9999999999) . mt_rand(1000000000, 9999999999);
-            return [
-                'status'                 => 'completed',
-                'gateway_transaction_id' => 'tx_sb_mit_' . Str::random(16),
-                'cybersource_request_id' => $mockRequestId,
-                'raw_gateway_response'   => [
-                    'id'     => $mockRequestId,
-                    'status' => 'AUTHORIZED',
-                    'mock'   => true,
-                ],
-            ];
-        }
+        $response = AtcSignatureService::request($tenant, 'POST', $path, $payload);
+        $status = $response['status'] ?? 'FAILED';
 
-        try {
-            $response = AtcSignatureService::request($tenant, 'POST', $path, $payload);
-            return [
-                'status'                 => ($response['status'] ?? '') === 'AUTHORIZED' ? 'completed' : 'failed',
-                'gateway_transaction_id' => $response['id'] ?? null,
-                'cybersource_request_id' => $response['id'] ?? null,
-                'raw_gateway_response'   => $response,
-            ];
-        } catch (Exception $e) {
-            Log::warning("Cybersource processRecurringMit error: " . $e->getMessage());
+        return [
+            'status'                 => $status === 'AUTHORIZED' ? 'completed' : 'failed',
+            'gateway_transaction_id' => $response['id'] ?? null,
+            'cybersource_request_id' => $response['id'] ?? null,
+            'raw_gateway_response'   => $response,
+        ];
+    }
 
-            if ($tenant->is_sandbox) {
-                $mockRequestId = '66' . mt_rand(1000000000, 9999999999) . mt_rand(1000000000, 9999999999);
-                return [
-                    'status'                 => 'completed',
-                    'gateway_transaction_id' => 'tx_sb_mit_' . Str::random(16),
-                    'cybersource_request_id' => $mockRequestId,
-                    'raw_gateway_response'   => [
-                        'id'     => $mockRequestId,
-                        'status' => 'AUTHORIZED',
-                        'mock'   => true,
-                    ],
-                ];
-            }
+    /**
+     * Procesa la solicitud de generación de QR de Pago ATC.
+     */
+    public function generateQr(Foundation $tenant, array $data): array
+    {
+        return AtcQrService::generate($tenant, $data);
+    }
 
-            throw $e;
-        }
+    /**
+     * Consulta el estado de una transacción QR.
+     */
+    public function queryQrStatus(Foundation $tenant, string $qrId): array
+    {
+        return AtcQrService::queryStatus($tenant, $qrId);
     }
 }

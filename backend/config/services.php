@@ -39,6 +39,14 @@ return [
         'monto_minimo_certificado' => env('DONATION_CERT_MIN_AMOUNT', 100),
     ],
 
+    'atc' => [
+        'merchant_id' => env('ATC_MERCHANT_ID', 'redenlace_000021'),
+        'key_id'      => env('ATC_KEY_ID', '3ada8327-76bd-4ed9-9952-0e8288f6e212'),
+        'secret_key'  => env('ATC_SECRET_KEY', '/zFZFhYflXW/P3BMzkULTcIuJhdcXCVD9SKJEo+fJXo='),
+        'base_url'    => env('ATC_BASE_URL', 'https://apitest.cybersource.com'),
+        'org_id'      => env('ATC_THREATMETRIX_ORG_ID', 'k8vif92e'),
+    ],
+
     'bnb' => [
         'account_id' => env('BNB_ACCOUNT_ID'),
         'authorization_id' => env('BNB_AUTH_ID'),

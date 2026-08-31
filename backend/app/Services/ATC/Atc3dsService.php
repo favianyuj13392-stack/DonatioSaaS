@@ -11,7 +11,7 @@ class Atc3dsService
 {
     /**
      * Paso 1: Setup Service (/risk/v1/authentication-setups)
-     * Inicia la sesión 3DS2 con Cybersource para obtener el JWT token de Cardinal Cruise.
+     * Inicia la sesión 3DS2 con Cybersource para obtener el JWT token real de Cardinal Cruise.
      */
     public static function setupSession(Foundation $tenant, string $referenceCode, ?array $cardData = null): array
     {
@@ -32,63 +32,41 @@ class Atc3dsService
             ];
         }
 
-        // En entorno sandbox con credenciales de prueba, responder de inmediato
-        if ($tenant->is_sandbox) {
-            return [
-                'accessToken'             => 'sandbox_jwt_' . Str::random(40),
-                'referenceId'             => 'SANDBOX-REF-' . strtoupper(Str::random(12)),
-                'deviceDataCollectionUrl' => 'https://centinelapistag.cardinalcommerce.com/V1/Cruise/Collect',
-                'merchantReferenceNumber' => $referenceCode,
-            ];
-        }
+        $response = AtcSignatureService::request($tenant, 'POST', $path, $payload);
+        $authInfo = $response['consumerAuthenticationInformation'] ?? [];
 
-        try {
-            $response = AtcSignatureService::request($tenant, 'POST', $path, $payload);
-            $authInfo = $response['consumerAuthenticationInformation'] ?? [];
-
-            return [
-                'accessToken'             => $authInfo['accessToken'] ?? ($response['accessToken'] ?? null),
-                'referenceId'             => $authInfo['referenceId'] ?? ($response['referenceId'] ?? null),
-                'deviceDataCollectionUrl' => $authInfo['deviceDataCollectionUrl'] ?? ($response['deviceDataCollectionUrl'] ?? 'https://centinelapistag.cardinalcommerce.com/V1/Cruise/Collect'),
-                'merchantReferenceNumber' => $referenceCode,
-            ];
-        } catch (Exception $e) {
-            Log::warning("Cybersource 3DS2 setupSession: " . $e->getMessage());
-
-            if ($tenant->is_sandbox) {
-                Log::info("Sandbox Mode activo: Retornando sesión 3DS2 simulada para {$tenant->name}");
-                return [
-                    'accessToken'             => 'sandbox_jwt_' . Str::random(40),
-                    'referenceId'             => 'SANDBOX-REF-' . strtoupper(Str::random(12)),
-                    'deviceDataCollectionUrl' => 'https://centinelapistag.cardinalcommerce.com/V1/Cruise/Collect',
-                    'merchantReferenceNumber' => $referenceCode,
-                ];
-            }
-
-            throw $e;
-        }
+        return [
+            'accessToken'             => $authInfo['accessToken'] ?? ($response['accessToken'] ?? null),
+            'referenceId'             => $authInfo['referenceId'] ?? ($response['referenceId'] ?? null),
+            'deviceDataCollectionUrl' => $authInfo['deviceDataCollectionUrl'] ?? ($response['deviceDataCollectionUrl'] ?? 'https://centinelapistag.cardinalcommerce.com/V1/Cruise/Collect'),
+            'merchantReferenceNumber' => $referenceCode,
+        ];
     }
 
     /**
      * Paso 3: Check Enrollment Service (/risk/v1/authentications)
-     * Evalúa si la tarjeta requiere Challenge (Step-Up) o aprueba vía Frictionless.
+     * Evalúa si la tarjeta requiere Challenge (Step-Up) o aprueba vía Frictionless en Cybersource.
      */
     public static function checkEnrollment(Foundation $tenant, array $data): array
     {
         $path = '/risk/v1/authentications';
+        
         $rawSessionId = !empty($data['fingerprint_session_id']) 
             ? $data['fingerprint_session_id'] 
-            : ($tenant->atc_merchant_id . '_' . Str::uuid()->toString());
+            : (!empty($data['fingerprintSessionId']) ? $data['fingerprintSessionId'] : Str::uuid()->toString());
 
-        // Sanitizar sesión para ThreatMetrix si ya contiene el prefijo del merchantId
-        $merchantId = (string) $tenant->atc_merchant_id;
+        // Sanitización obligatoria del fingerprintSessionId para ThreatMetrix
+        $merchantId = (string) ($tenant->atc_merchant_id ?: config('services.atc.merchant_id', 'redenlace_000021'));
         if (!empty($merchantId) && str_starts_with($rawSessionId, $merchantId)) {
             $rawSessionId = substr($rawSessionId, strlen($merchantId));
         }
+        $rawSessionId = ltrim($rawSessionId, '_');
+
+        $referenceNo = $data['merchant_reference_number'] ?? ($data['merchantReferenceNumber'] ?? ('ATC-REF-' . strtoupper(Str::random(10))));
 
         $payload = [
             'clientReferenceInformation' => [
-                'code' => $data['merchant_reference_number'] ?? ('ATC-REF-' . strtoupper(Str::random(10))),
+                'code' => $referenceNo,
             ],
             'orderInformation' => [
                 'amountDetails' => [
@@ -112,141 +90,95 @@ class Atc3dsService
                 'fingerprintSessionId' => $rawSessionId,
             ],
             'consumerAuthenticationInformation' => [
-                'referenceId' => $data['reference_id'] ?? null,
-                'returnUrl'   => $data['return_url'] ?? (config('app.url') . '/api/v1/donations/stepup-return'),
+                'referenceId' => $data['reference_id'] ?? ($data['referenceId'] ?? null),
+                'returnUrl'   => $data['return_url'] ?? ($data['returnUrl'] ?? (config('app.url') . '/api/v1/donations/stepup-return')),
             ],
         ];
 
-        // En entorno sandbox con credenciales demo, simular según el tipo de tarjeta (Frictionless vs Challenge)
-        if ($tenant->is_sandbox) {
-            $cleanNumber = preg_replace('/\D/', '', $data['card_number'] ?? '');
-            $isChallengeCard = str_ends_with($cleanNumber, '0002');
+        $maskedPayload = $payload;
+        if (isset($maskedPayload['paymentInformation']['card']['number'])) {
+            $cNum = (string) $maskedPayload['paymentInformation']['card']['number'];
+            $maskedPayload['paymentInformation']['card']['number'] = substr($cNum, 0, 6) . '******' . substr($cNum, -4);
+        }
+        if (isset($maskedPayload['paymentInformation']['card']['securityCode'])) {
+            $maskedPayload['paymentInformation']['card']['securityCode'] = '***';
+        }
+        Log::info('[ATC CheckEnrollment Payload]: ' . json_encode($maskedPayload));
 
-            if ($isChallengeCard) {
-                return [
-                    'success'                     => true,
-                    'isChallengeRequired'         => true,
-                    'status'                      => 'PENDING_AUTHENTICATION',
-                    'stepUpJwt'                   => 'sandbox_stepup_jwt_' . Str::random(30),
-                    'acsUrl'                      => 'https://centinelapistag.cardinalcommerce.com/V2/Cruise/StepUp',
-                    'stepUpUrl'                   => 'https://centinelapistag.cardinalcommerce.com/V2/Cruise/StepUp',
-                    'authenticationTransactionId' => 'auth_tx_' . Str::random(16),
-                ];
-            }
+        $response = AtcSignatureService::request($tenant, 'POST', $path, $payload);
+        Log::info('[ATC CheckEnrollment Raw Response]: ' . json_encode($response));
 
+        $authInfo = $response['consumerAuthenticationInformation'] ?? [];
+        $status = $response['status'] ?? ($authInfo['status'] ?? 'FAILED');
+
+        $rawEci = $authInfo['eci'] ?? ($authInfo['eciRaw'] ?? ($authInfo['ecommerceIndicator'] ?? null));
+        $cardNum = $data['card_number'] ?? '';
+        $eciCode = is_numeric($rawEci) ? str_pad((string)$rawEci, 2, '0', STR_PAD_LEFT) : (str_starts_with($cardNum, '5') ? '02' : '05');
+
+        if ($status === 'AUTHENTICATION_SUCCESSFUL') {
             return [
                 'success'                    => true,
                 'isChallengeRequired'        => false,
                 'status'                     => 'AUTHENTICATION_SUCCESSFUL',
-                'eci'                        => str_starts_with($cleanNumber, '5') ? '02' : '05',
-                'cavv'                       => 'AAABBBCCC111222333==',
-                'threeDSServerTransactionId' => '3ds_tx_' . Str::random(16),
-                'specificationVersion'       => '2.2.0',
+                'eci'                        => $eciCode,
+                'cavv'                       => $authInfo['cavv'] ?? ($authInfo['token'] ?? ($authInfo['ucafAuthenticationData'] ?? null)),
+                'xid'                        => $authInfo['xid'] ?? null,
+                'veresEnrolled'              => $authInfo['veresEnrolled'] ?? 'Y',
+                'threeDSServerTransactionId' => $authInfo['threeDSServerTransactionId'] ?? null,
+                'specificationVersion'       => $authInfo['specificationVersion'] ?? '2.2.0',
             ];
-        }
-
-        try {
-            $response = AtcSignatureService::request($tenant, 'POST', $path, $payload);
-            $authInfo = $response['consumerAuthenticationInformation'] ?? [];
-            $status = $response['status'] ?? ($authInfo['status'] ?? 'FAILED');
-
-            $rawEci = $authInfo['eci'] ?? ($authInfo['eciRaw'] ?? ($authInfo['ecommerceIndicator'] ?? null));
-            $cardNum = $data['card_number'] ?? '';
-            $eciCode = is_numeric($rawEci) ? str_pad((string)$rawEci, 2, '0', STR_PAD_LEFT) : (str_starts_with($cardNum, '5') ? '02' : '05');
-
-            if ($status === 'AUTHENTICATION_SUCCESSFUL') {
-                return [
-                    'success'                    => true,
-                    'isChallengeRequired'        => false,
-                    'status'                     => 'AUTHENTICATION_SUCCESSFUL',
-                    'eci'                        => $eciCode,
-                    'cavv'                       => $authInfo['cavv'] ?? $authInfo['token'] ?? $authInfo['ucafAuthenticationData'] ?? null,
-                    'xid'                        => $authInfo['xid'] ?? null,
-                    'veresEnrolled'              => $authInfo['veresEnrolled'] ?? 'Y',
-                    'threeDSServerTransactionId' => $authInfo['threeDSServerTransactionId'] ?? null,
-                    'specificationVersion'       => $authInfo['specificationVersion'] ?? '2.2.0',
-                ];
-            } elseif ($status === 'PENDING_AUTHENTICATION') {
-                return [
-                    'success'                     => true,
-                    'isChallengeRequired'         => true,
-                    'status'                      => 'PENDING_AUTHENTICATION',
-                    'stepUpJwt'                   => $authInfo['accessToken'] ?? null,
-                    'acsUrl'                      => $authInfo['acsUrl'] ?? null,
-                    'stepUpUrl'                   => 'https://centinelapistag.cardinalcommerce.com/V2/Cruise/StepUp',
-                    'authenticationTransactionId' => $authInfo['authenticationTransactionId'] ?? null,
-                ];
-            }
-
+        } elseif ($status === 'PENDING_AUTHENTICATION') {
             return [
-                'success'             => false,
-                'isChallengeRequired' => false,
-                'status'              => $status,
-                'message'             => 'La tarjeta no pudo ser autenticada por el banco emisor.',
-                'raw'                 => $response,
+                'success'                     => true,
+                'isChallengeRequired'         => true,
+                'status'                      => 'PENDING_AUTHENTICATION',
+                'stepUpJwt'                   => $authInfo['accessToken'] ?? null,
+                'acsUrl'                      => $authInfo['acsUrl'] ?? null,
+                'stepUpUrl'                   => $authInfo['stepUpUrl'] ?? 'https://centinelapistag.cardinalcommerce.com/V2/Cruise/StepUp',
+                'authenticationTransactionId' => $authInfo['authenticationTransactionId'] ?? null,
             ];
-        } catch (Exception $e) {
-            Log::warning("Cybersource checkEnrollment error: " . $e->getMessage());
-
-            if ($tenant->is_sandbox) {
-                return [
-                    'success'                    => true,
-                    'isChallengeRequired'        => false,
-                    'status'                     => 'AUTHENTICATION_SUCCESSFUL',
-                    'eci'                        => str_starts_with($data['card_number'] ?? '', '5') ? '02' : '05',
-                    'cavv'                       => 'AAABBBCCC111222333==',
-                    'threeDSServerTransactionId' => '3ds_tx_' . Str::random(16),
-                    'specificationVersion'       => '2.2.0',
-                ];
-            }
-
-            throw $e;
         }
+
+        return [
+            'success'             => false,
+            'isChallengeRequired' => false,
+            'status'              => $status,
+            'message'             => 'La tarjeta no pudo ser autenticada por el banco emisor.',
+            'raw'                 => $response,
+        ];
     }
 
     /**
      * Paso 5: Validation Service (/risk/v1/authentication-results)
-     * Valida el resultado del desafío completado por el cliente en el modal Step-Up.
+     * Valida el resultado del desafío completado por el cliente en el modal Step-Up con Cybersource.
      */
     public static function validateChallenge(Foundation $tenant, array $data): array
     {
         $path = '/risk/v1/authentication-results';
         $payload = [
             'clientReferenceInformation' => [
-                'code' => $data['merchant_reference_number'] ?? ('ATC-REF-' . strtoupper(Str::random(10))),
+                'code' => $data['merchant_reference_number'] ?? ($data['merchantReferenceNumber'] ?? ('ATC-REF-' . strtoupper(Str::random(10)))),
             ],
             'consumerAuthenticationInformation' => [
-                'authenticationTransactionId' => $data['authentication_transaction_id'] ?? $data['authenticationTransactionId'],
+                'authenticationTransactionId' => $data['authentication_transaction_id'] ?? ($data['authenticationTransactionId'] ?? null),
             ],
         ];
 
-        try {
-            $response = AtcSignatureService::request($tenant, 'POST', $path, $payload);
-            $authInfo = $response['consumerAuthenticationInformation'] ?? [];
-            $status = $authInfo['status'] ?? ($response['status'] ?? 'FAILED');
-            $eci = $authInfo['eci'] ?? ($authInfo['eciRaw'] ?? ($authInfo['ecommerceIndicator'] ?? '05'));
+        $response = AtcSignatureService::request($tenant, 'POST', $path, $payload);
+        $authInfo = $response['consumerAuthenticationInformation'] ?? [];
+        $status = $authInfo['status'] ?? ($response['status'] ?? 'FAILED');
+        $eci = $authInfo['eci'] ?? ($authInfo['eciRaw'] ?? ($authInfo['ecommerceIndicator'] ?? '05'));
 
-            return [
-                'success'                    => ($status === 'AUTHENTICATION_SUCCESSFUL'),
-                'status'                     => $status,
-                'eci'                        => $eci,
-                'cavv'                       => $authInfo['cavv'] ?? $authInfo['token'] ?? $authInfo['ucafAuthenticationData'] ?? null,
-                'xid'                        => $authInfo['xid'] ?? null,
-                'threeDSServerTransactionId' => $authInfo['threeDSServerTransactionId'] ?? null,
-                'specificationVersion'       => $authInfo['specificationVersion'] ?? '2.2.0',
-                'raw'                        => $response,
-            ];
-        } catch (Exception $e) {
-            if ($tenant->is_sandbox) {
-                return [
-                    'success' => true,
-                    'status'  => 'AUTHENTICATION_SUCCESSFUL',
-                    'eci'     => '05',
-                    'cavv'    => 'AAABBBCCC111222333==',
-                ];
-            }
-            throw $e;
-        }
+        return [
+            'success'                    => ($status === 'AUTHENTICATION_SUCCESSFUL'),
+            'status'                     => $status,
+            'eci'                        => is_numeric($eci) ? str_pad((string)$eci, 2, '0', STR_PAD_LEFT) : $eci,
+            'cavv'                       => $authInfo['cavv'] ?? ($authInfo['token'] ?? ($authInfo['ucafAuthenticationData'] ?? null)),
+            'xid'                        => $authInfo['xid'] ?? null,
+            'threeDSServerTransactionId' => $authInfo['threeDSServerTransactionId'] ?? null,
+            'specificationVersion'       => $authInfo['specificationVersion'] ?? '2.2.0',
+            'raw'                        => $response,
+        ];
     }
 
     /**
@@ -263,7 +195,7 @@ class Atc3dsService
         $address1 = !empty($data['address1']) ? $data['address1'] : 'Av. Principal 123';
         $postalCode = !empty($data['postal_code']) ? $data['postal_code'] : ($country === 'BO' ? '0000' : ($country === 'US' ? '33101' : '00000'));
 
-        $fullName = $data['donor_name'] ?? ($data['first_name'] ?? 'Donante Anónimo');
+        $fullName = $data['donor_name'] ?? ($data['cardholderName'] ?? ($data['first_name'] ?? 'Donante'));
         $nameParts = explode(' ', trim($fullName));
         $firstName = $data['first_name'] ?? ($nameParts[0] ?? 'Donante');
         $lastName = $data['last_name'] ?? (isset($nameParts[1]) ? implode(' ', array_slice($nameParts, 1)) : 'Solidario');
