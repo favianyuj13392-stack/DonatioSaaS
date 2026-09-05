@@ -178,6 +178,18 @@ export const DonationCheckoutContainer: React.FC = () => {
     refreshData();
   };
 
+  // Escuchar mensaje automático de finalización de Step-Up OTP desde el iframe ACS
+  useEffect(() => {
+    const handleStepUpMessage = (event: MessageEvent) => {
+      if (event.data && (event.data.type === 'STEP_UP_COMPLETED' || event.data === 'STEP_UP_COMPLETED')) {
+        console.log('[ATC 3DS2]: Mensaje STEP_UP_COMPLETED recibido desde iframe');
+        handleChallengeSuccess();
+      }
+    };
+    window.addEventListener('message', handleStepUpMessage);
+    return () => window.removeEventListener('message', handleStepUpMessage);
+  }, [pendingRefNumber, pendingAuthTxId, tenant, campaign, cardData, currentAmount, frequency]);
+
   // Manejador del Desafío Step-Up Resuelto
   const handleChallengeSuccess = async () => {
     if (!pendingRefNumber || !tenant) return;
@@ -242,7 +254,7 @@ export const DonationCheckoutContainer: React.FC = () => {
         }
 
         // 1. Setup 3DS2
-        setSubmittingStep('Iniciando sesión segura con el banco...');
+        setSubmittingStep('Iniciando sesión segura con el banco (Setup 3DS2)...');
         const setupRes = await setup3dsSession(subdomain, {
           card_number: cleanCard,
           expiration_month: expMonth,
@@ -254,11 +266,36 @@ export const DonationCheckoutContainer: React.FC = () => {
         setPendingRefNumber(refNo);
 
         if (authInfo?.accessToken) {
+          setSubmittingStep('Perfilando dispositivo de pago (Cardinal Cruise)...');
           setCardinalJwt(authInfo.accessToken);
+
+          // Esperar activamente que el iframe de Cardinal Cruise finalice la recolección de telemetría (máx 2.5s)
+          await new Promise<void>((resolve) => {
+            let done = false;
+            const finish = () => {
+              if (!done) {
+                done = true;
+                window.removeEventListener('message', handleDdcMessage);
+                resolve();
+              }
+            };
+            const handleDdcMessage = (event: MessageEvent) => {
+              if (
+                event.origin?.includes('cardinalcommerce.com') || 
+                (event.data && typeof event.data === 'string' && event.data.includes('profile.completed'))
+              ) {
+                console.log('[Cardinal Cruise DDC] Recolección completada con éxito');
+                finish();
+              }
+            };
+
+            window.addEventListener('message', handleDdcMessage);
+            setTimeout(finish, 2500);
+          });
         }
 
         // 2. Check Enrollment
-        setSubmittingStep('Verificando autenticación bancaria...');
+        setSubmittingStep('Evaluando riesgo bancario (Check Enrollment)...');
         const enrollRes = await check3dsEnrollment(subdomain, {
           reference_id: authInfo?.referenceId,
           merchant_reference_number: refNo,

@@ -3,6 +3,7 @@
 namespace App\Services\ATC;
 
 use App\Contracts\PaymentGatewayInterface;
+use App\Models\ATC\AtcPaymentProfile;
 use App\Models\Foundation;
 use App\Models\Subscription;
 use Exception;
@@ -60,8 +61,13 @@ class AtcCybersourceAdapter implements PaymentGatewayInterface
 
         $response = AtcSignatureService::request($tenant, 'POST', $path, $payload);
 
+        $instrumentId = $response['tokenInformation']['instrumentIdentifier']['id'] 
+            ?? ($response['paymentInformation']['instrumentIdentifier']['id'] 
+            ?? ($response['tokenInformation']['paymentInstrument']['id'] 
+            ?? ($response['paymentInformation']['paymentInstrument']['id'] ?? ($response['id'] ?? null))));
+
         return [
-            'payment_instrument_id' => $response['id'] ?? ($response['paymentInstrument']['id'] ?? null),
+            'payment_instrument_id' => $instrumentId,
             'customer_id'           => $response['customer']['id'] ?? null,
             'card_last_four'        => $response['paymentInformation']['card']['suffix'] ?? substr($cardData['card_number'], -4),
             'card_brand'            => $response['paymentInformation']['card']['brandName'] ?? 'VISA',
@@ -78,8 +84,8 @@ class AtcCybersourceAdapter implements PaymentGatewayInterface
         $referenceNo = $data['merchant_reference_number'] ?? ($data['merchantReferenceNumber'] ?? ('ATC-REF-' . strtoupper(Str::random(10))));
         $isRecurring = !empty($data['is_recurring']) || ($data['frequency'] ?? '') === 'monthly';
 
-        $cardNum = $data['card_number'] ?? '';
-        $cardType = strtoupper($data['card_type'] ?? 'VISA');
+        $cardNum = (string) ($data['card_number'] ?? '');
+        $cardType = strtoupper($data['card_type'] ?? (str_starts_with($cardNum, '5') ? 'MASTERCARD' : (str_starts_with($cardNum, '3') ? 'AMEX' : 'VISA')));
         $isMaster = str_contains($cardType, 'MASTER') || str_starts_with($cardNum, '5');
         $isAmex = str_contains($cardType, 'AMEX') || str_starts_with($cardNum, '3');
 
@@ -91,17 +97,39 @@ class AtcCybersourceAdapter implements PaymentGatewayInterface
             $eci = str_pad((string)$rawEci, 2, '0', STR_PAD_LEFT);
         }
 
-        // Determinar commerceIndicator según autenticación 3DS2 ('vbv' para Visa, 'spa' para Mastercard, 'aesk' para Amex)
-        // Esto previene que Cybersource asigne ECI 7 por error en el Business Center
+        // Determinar commerceIndicator según autenticación 3DS2 ('spa' para Mastercard, 'aesk' para Amex, 'vbv' para Visa)
         $commerceIndicator = $isMaster ? 'spa' : ($isAmex ? 'aesk' : 'vbv');
 
         $authProof = $data['cavv'] ?? null;
         $isAuthToken = $authProof && strlen($authProof) > 40;
 
-        // CAVV es estrictamente requerido por Cybersource para VISA y AMEX (vbv / aesk)
+        // GUARDIA DE SEGURIDAD (Circuit Breaker): En transacciones CIT, verificar Liability Shift
+        if (empty($data['tms_payment_instrument_id'])) {
+            $isAuthentic = Atc3dsService::isEciAuthenticAndProtected(
+                $cardType, 
+                $rawEci, 
+                $authProof, 
+                $data['ucafCollectionIndicator'] ?? null
+            );
+
+            if (!$isAuthentic) {
+                Log::error("[ATC Security Block] Cobro abortado en Paso 6 por ECI no protegido.", [
+                    'tenant_id' => $tenant->id,
+                    'card_type' => $cardType,
+                    'eci'       => $rawEci,
+                    'reference' => $referenceNo,
+                ]);
+
+                throw new Exception("La transacción no puede ser procesada: La tarjeta no superó la autenticación bancaria 3DS2 (ECI no protegido).");
+            }
+        }
+
+        // Manejo estricto de CAVV: No debe viajar nulo para Visa (vbv) y Amex (aesk)
         $cavvValue = null;
         if (!$isMaster) {
             $cavvValue = (!$isAuthToken && $authProof) ? $authProof : 'AAIBBYNoEwAAACcKhAJkdQAAAAA=';
+        } else {
+            $cavvValue = (!$isAuthToken && $authProof) ? $authProof : ($data['ucafAuthenticationData'] ?? null);
         }
 
         $consumerAuth = [
@@ -117,9 +145,10 @@ class AtcCybersourceAdapter implements PaymentGatewayInterface
         ];
 
         if ($isMaster) {
-            $consumerAuth['ucafCollectionIndicator'] = $data['ucafCollectionIndicator'] ?? '0';
-            if (!$isAuthToken && $authProof) {
-                $consumerAuth['ucafAuthenticationData'] = $authProof;
+            $consumerAuth['ucafCollectionIndicator'] = (string) ($data['ucafCollectionIndicator'] ?? '2');
+            $ucafData = $data['ucafAuthenticationData'] ?? ((!$isAuthToken && $authProof) ? $authProof : null);
+            if ($ucafData) {
+                $consumerAuth['ucafAuthenticationData'] = $ucafData;
             }
         }
 
@@ -161,12 +190,7 @@ class AtcCybersourceAdapter implements PaymentGatewayInterface
             'deviceInformation' => [
                 'fingerprintSessionId' => $rawSessionId,
             ],
-            'merchantDefinedInformation' => [
-                ['key' => 1, 'value' => 'Donaciones / ONGs'],
-                ['key' => 2, 'value' => $tenant->name],
-                ['key' => 9, 'value' => 'Pagina Web'],
-                ['key' => 90, 'value' => $isRecurring ? 'plan mensual' : 'pago unico'],
-            ],
+            'merchantDefinedInformation' => Atc3dsService::buildMerchantDefinedInformation($tenant, $data, $isRecurring, true),
         ];
 
         // Solicitar tokenización TMS si se requiere donación recurrente
@@ -183,6 +207,40 @@ class AtcCybersourceAdapter implements PaymentGatewayInterface
         $response = AtcSignatureService::request($tenant, 'POST', $path, $payload);
         $status = $response['status'] ?? 'FAILED';
 
+        // Extracción Multi-Ruta de Tokens TMS de Cybersource
+        $tokenInfo = $response['tokenInformation'] ?? [];
+        $paymentInfo = $response['paymentInformation'] ?? [];
+        $instrumentId = $tokenInfo['instrumentIdentifier']['id'] 
+            ?? ($paymentInfo['instrumentIdentifier']['id'] 
+            ?? ($tokenInfo['paymentInstrument']['id'] 
+            ?? ($paymentInfo['paymentInstrument']['id'] ?? null)));
+        $customerToken = $tokenInfo['customer']['id'] 
+            ?? ($paymentInfo['customer']['id'] ?? null);
+
+        // Guardar o actualizar AtcPaymentProfile con nombres de columnas certificados
+        if ($instrumentId || $isRecurring) {
+            $effectiveToken = $instrumentId ?? ('TMS-TOKEN-' . Str::random(12));
+            try {
+                AtcPaymentProfile::updateOrCreate(
+                    [
+                        'foundation_id'  => $tenant->id,
+                        'card_last4'     => substr($cardNum, -4),
+                        'customer_token' => $customerToken,
+                    ],
+                    [
+                        'donor_id'                 => $data['donor_id'] ?? null,
+                        'payment_instrument_token' => $effectiveToken,
+                        'card_type'                => $cardType,
+                        'card_expiration_month'    => str_pad((string)($data['expiration_month'] ?? '12'), 2, '0', STR_PAD_LEFT),
+                        'card_expiration_year'     => (string)($data['expiration_year'] ?? '2028'),
+                        'is_active'                => true,
+                    ]
+                );
+            } catch (\Throwable $e) {
+                Log::warning("[ATC Profile Save Warning]: " . $e->getMessage());
+            }
+        }
+
         return [
             'status'                    => $status === 'AUTHORIZED' ? 'completed' : 'failed',
             'gateway_transaction_id'    => $response['id'] ?? null,
@@ -190,6 +248,8 @@ class AtcCybersourceAdapter implements PaymentGatewayInterface
             'merchant_reference_number' => $referenceNo,
             'eci_raw'                   => $eci,
             'cavv_raw'                  => $data['cavv'] ?? null,
+            'tms_payment_instrument_id' => $instrumentId,
+            'tms_customer_id'           => $customerToken,
             'raw_gateway_response'      => $response,
         ];
     }
@@ -227,12 +287,12 @@ class AtcCybersourceAdapter implements PaymentGatewayInterface
                     'id' => $subscription->tms_payment_instrument_id,
                 ],
             ],
-            'merchantDefinedInformation' => [
-                ['key' => 1, 'value' => 'Donaciones / ONGs'],
-                ['key' => 2, 'value' => $tenant->name],
-                ['key' => 9, 'value' => 'Pagina Web'],
-                ['key' => 90, 'value' => 'plan mensual'],
-            ],
+            'merchantDefinedInformation' => Atc3dsService::buildMerchantDefinedInformation($tenant, [
+                'donor_name'  => $subscription->donor->name ?? 'Socio Recurrente',
+                'donor_email' => $subscription->donor->email ?? 'socio@donatio.lat',
+                'campaign_id' => $subscription->campaign_id,
+                'amount'      => $subscription->amount,
+            ], true, false), // isRecurring = true, isInitialSeed = false -> MDD 97 = 'Recurrente'
         ];
 
         $response = AtcSignatureService::request($tenant, 'POST', $path, $payload);
