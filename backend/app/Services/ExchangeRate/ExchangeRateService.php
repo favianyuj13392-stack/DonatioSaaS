@@ -94,11 +94,18 @@ class ExchangeRateService
 
         $latest = $this->getLatestConfirmedRate($pair);
         if ($latest) {
+            if ($latest->effective_date && $latest->effective_date->diffInHours(now()) > 36) {
+                Log::warning("ExchangeRateService: Latest confirmed exchange rate for {$pair} is stale (>36h). Verify BCB synchronization scheduler.", [
+                    'effective_date' => $latest->effective_date->toDateString(),
+                    'sell_rate'      => (float) $latest->sell_rate,
+                    'hours_old'      => $latest->effective_date->diffInHours(now()),
+                ]);
+            }
             $this->cacheRate($latest);
             return (float) $latest->sell_rate;
         }
 
-        // Valor de respaldo histórico seguro si la base de datos estuviese vacía
+        Log::critical("ExchangeRateService: No confirmed exchange rate found in database for {$pair}. Falling back to hardcoded rate 11.93.");
         return 11.93;
     }
 

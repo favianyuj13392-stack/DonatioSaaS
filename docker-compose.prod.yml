@@ -69,7 +69,27 @@ services:
       donatio_redis:
         condition: service_started
 
-  # 4. Base de Datos Aislada PostgreSQL 16 (Row Level Security)
+  # 4. Laravel Scheduler (Sincronización BCB y Facturación Recurrente)
+  donatio_scheduler:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: donatio_scheduler
+    restart: unless-stopped
+    command: php /app/artisan schedule:work
+    env_file:
+      - .env
+    volumes:
+      - donatio_storage:/app/storage
+    networks:
+      - donatio_net
+    depends_on:
+      donatio_postgres:
+        condition: service_healthy
+      donatio_redis:
+        condition: service_started
+
+  # 5. Base de Datos Aislada PostgreSQL 16 (Row Level Security)
   donatio_postgres:
     image: postgres:16-alpine
     container_name: donatio_postgres
@@ -91,7 +111,7 @@ services:
       retries: 5
       start_period: 20s
 
-  # 5. Caché y Colas Redis 7
+  # 6. Caché y Colas Redis 7
   donatio_redis:
     image: redis:7-alpine
     container_name: donatio_redis
