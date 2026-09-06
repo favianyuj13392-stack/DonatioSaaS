@@ -45,11 +45,16 @@ class DonationResource extends Resource
                     ->searchable()
                     ->sortable(),
 
-                Tables\Columns\TextColumn::make('donor_display')
+                Tables\Columns\TextColumn::make('donor.name')
                     ->label('Donante')
-                    ->state(fn (Donation $record): string => $record->is_anonymous ? 'Donante Anónimo' : ($record->donor->name ?? 'Donante'))
+                    ->formatStateUsing(fn ($state, Donation $record): string => $record->is_anonymous ? 'Donante Anónimo' : ($record->donor->name ?? 'Donante'))
                     ->description(fn (Donation $record): string => $record->is_anonymous ? 'Aporte Privado' : ($record->donor->email ?? ''))
-                    ->searchable(),
+                    ->searchable(query: function (\Illuminate\Database\Eloquent\Builder $query, string $search): \Illuminate\Database\Eloquent\Builder {
+                        return $query->whereHas('donor', function ($q) use ($search) {
+                            $q->where('name', 'ilike', "%{$search}%")
+                              ->orWhere('email', 'ilike', "%{$search}%");
+                        });
+                    }),
 
                 Tables\Columns\TextColumn::make('amount')
                     ->label('Monto Bruto')
