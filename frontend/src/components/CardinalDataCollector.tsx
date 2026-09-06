@@ -8,7 +8,10 @@ interface CardinalDataCollectorProps {
 
 export const CardinalDataCollector: React.FC<CardinalDataCollectorProps> = ({
   jwt,
-  collectionUrl = 'https://centinelapistag.cardinalcommerce.com/V1/Cruise/Collect',
+  collectionUrl = import.meta.env.VITE_CARDINAL_COLLECTION_URL ||
+    (import.meta.env.PROD
+      ? 'https://centinelapi.cardinalcommerce.com/V1/Cruise/Collect'
+      : 'https://centinelapistag.cardinalcommerce.com/V1/Cruise/Collect'),
   onComplete,
 }) => {
   const formRef = useRef<HTMLFormElement>(null);

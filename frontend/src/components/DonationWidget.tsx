@@ -289,7 +289,32 @@ export const DonationWidget: React.FC = () => {
         setPendingRefNumber(refNo);
 
         if (authInfo?.accessToken) {
+          setSubmittingStep('Perfilando dispositivo de pago (Cardinal Cruise)...');
           setCardinalJwt(authInfo.accessToken);
+
+          // Esperar activamente que el iframe de Cardinal Cruise finalice la recolección de telemetría (máx 2.5s)
+          await new Promise<void>((resolve) => {
+            let done = false;
+            const finish = () => {
+              if (!done) {
+                done = true;
+                window.removeEventListener('message', handleDdcMessage);
+                resolve();
+              }
+            };
+            const handleDdcMessage = (event: MessageEvent) => {
+              if (
+                event.origin?.includes('cardinalcommerce.com') ||
+                (event.data && typeof event.data === 'string' && event.data.includes('profile.completed'))
+              ) {
+                console.log('[Cardinal Cruise DDC] Recolección completada con éxito');
+                finish();
+              }
+            };
+
+            window.addEventListener('message', handleDdcMessage);
+            setTimeout(finish, 2500);
+          });
         }
 
         const nameParts = cardData.cardholderName.trim().split(' ');
