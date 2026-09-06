@@ -173,11 +173,27 @@ class SubscriptionResource extends Resource
                     ->visible(fn (Subscription $record) => in_array($record->status, ['failed', 'cancelled']))
                     ->action(function (Subscription $record): void {
                         $token = $record->generateReactivationToken();
-                        $link = "https://{$record->foundation->subdomain}.donatio.lat/reactivar/{$token}";
+                        $subdomain = $record->foundation?->subdomain ?? 'donatio';
+
+                        $requestHost = request()->getHost();
+                        $hostParts = explode('.', $requestHost);
+                        if (count($hostParts) >= 2) {
+                            $apexDomain = implode('.', array_slice($hostParts, -2));
+                        } else {
+                            $apexDomain = env('SAAS_DOMAIN', 'darkosync.com');
+                        }
+
+                        $link = "https://{$subdomain}.{$apexDomain}/reactivar/{$token}";
 
                         Notification::make()
-                            ->title('Enlace de Reactivación 72h')
-                            ->body("Enlace generado: {$link}")
+                            ->title('Enlace de Reactivación 72h Generado')
+                            ->body("Enlace: {$link}")
+                            ->actions([
+                                \Filament\Notifications\Actions\Action::make('open')
+                                    ->label('Abrir Enlace')
+                                    ->url($link)
+                                    ->openUrlInNewTab(),
+                            ])
                             ->success()
                             ->persistent()
                             ->send();

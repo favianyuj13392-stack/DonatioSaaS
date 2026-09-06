@@ -84,4 +84,12 @@ class Subscription extends Model
 
         return $token;
     }
+
+    /**
+     * Alias compatible para generar token de reactivación.
+     */
+    public function generateReactivationToken(): string
+    {
+        return $this->getOrGenerateReactivationToken();
+    }
 }
