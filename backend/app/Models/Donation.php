@@ -22,6 +22,9 @@ class Donation extends Model
         'eci_raw',
         'cavv_raw',
         'amount',
+        'amount_bob',
+        'amount_usd',
+        'exchange_rate_bcb',
         'saas_fee_amount',
         'atc_fee_estimated_amount',
         'net_estimated_to_foundation',
@@ -38,6 +41,9 @@ class Donation extends Model
 
     protected $casts = [
         'amount'                      => 'decimal:2',
+        'amount_bob'                  => 'decimal:2',
+        'amount_usd'                  => 'decimal:2',
+        'exchange_rate_bcb'           => 'decimal:4',
         'saas_fee_amount'             => 'decimal:2',
         'atc_fee_estimated_amount'    => 'decimal:2',
         'net_estimated_to_foundation' => 'decimal:2',
@@ -67,28 +73,18 @@ class Donation extends Model
     }
 
     /**
-     * Retorna el monto en Bolivianos (BOB) según el tipo de cambio oficial para USD.
+     * Retorna el monto inmutable en Bolivianos (BOB).
      */
     public function getAmountInBobAttribute(): float
     {
-        if ($this->currency === 'USD') {
-            $rate = (float) config('donatio.usd_exchange_rate', 6.96);
-            return round((float) $this->amount * $rate, 2);
-        }
-
-        return (float) $this->amount;
+        return (float) ($this->attributes['amount_bob'] ?? $this->amount);
     }
 
     /**
-     * Retorna la comisión SaaS en Bolivianos (BOB).
+     * Retorna la comisión SaaS inmutable en Bolivianos (BOB).
      */
     public function getSaasFeeInBobAttribute(): float
     {
-        if ($this->currency === 'USD') {
-            $rate = (float) config('donatio.usd_exchange_rate', 6.96);
-            return round((float) $this->saas_fee_amount * $rate, 2);
-        }
-
-        return (float) $this->saas_fee_amount;
+        return (float) ($this->attributes['saas_fee_amount'] ?? 0.00);
     }
 }

@@ -6,6 +6,7 @@ use App\Models\Donation;
 use App\Models\Subscription;
 use App\Models\TenantBillingLedger;
 use App\Services\ATC\AtcCybersourceAdapter;
+use App\Services\ExchangeRate\ExchangeRateService;
 use Exception;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -96,8 +97,21 @@ class ProcessSubscriptionBillingJob implements ShouldQueue
 
             if (($result['status'] ?? '') === 'completed') {
                 DB::transaction(function () use ($subscription, $tenant, $result, $idempotencyKey) {
-                    // Liquidación financiera inmutable
-                    $settlement = $tenant->calculateSettlement((float) $subscription->amount, 'card');
+                    $rateService = app(ExchangeRateService::class);
+                    $rateBcb = $rateService->getCurrentSellRate('USD/BOB');
+                    $currency = strtoupper($subscription->currency ?? 'BOB');
+                    $subAmount = (float) $subscription->amount;
+
+                    if ($currency === 'USD') {
+                        $amountUsd = $subAmount;
+                        $amountBob = round($amountUsd * $rateBcb, 2);
+                    } else {
+                        $amountBob = $subAmount;
+                        $amountUsd = round($amountBob / $rateBcb, 2);
+                    }
+
+                    // Liquidación financiera inmutable en BOB
+                    $settlement = $tenant->calculateSettlement($amountBob, 'card');
 
                     // Crear registro de donación completada
                     $donation = Donation::create([
@@ -107,11 +121,14 @@ class ProcessSubscriptionBillingJob implements ShouldQueue
                         'subscription_id'             => $subscription->id,
                         'merchant_reference_number'   => $idempotencyKey,
                         'cybersource_request_id'      => $result['cybersource_request_id'] ?? null,
-                        'amount'                      => $subscription->amount,
+                        'amount'                      => $subAmount,
+                        'amount_bob'                  => $amountBob,
+                        'amount_usd'                  => $amountUsd,
+                        'exchange_rate_bcb'           => $rateBcb,
                         'saas_fee_amount'             => $settlement['saas_fee_amount'],
                         'atc_fee_estimated_amount'    => $settlement['atc_fee_estimated_amount'],
                         'net_estimated_to_foundation' => $settlement['net_estimated_to_foundation'],
-                        'currency'                    => $subscription->currency ?? 'BOB',
+                        'currency'                    => $currency,
                         'payment_method'              => 'card',
                         'donation_type'               => 'subscription_recurring',
                         'status'                      => 'completed',
@@ -119,18 +136,18 @@ class ProcessSubscriptionBillingJob implements ShouldQueue
                         'raw_gateway_response'        => $result['raw_gateway_response'] ?? null,
                     ]);
 
-                    // Incrementar recaudación si tiene campaña
+                    // Incrementar recaudación en BOB si tiene campaña
                     if ($subscription->campaign_id && $subscription->campaign) {
-                        $subscription->campaign->increment('current_amount', $subscription->amount);
+                        $subscription->campaign->increment('current_amount', $amountBob);
                     }
 
-                    // Registrar comisión SaaS
+                    // Registrar comisión SaaS en el ledger en base a BOB
                     $feePercentage = (float) ($tenant->saas_fee_card ?? config('donatio.default_saas_fee_card', 2.00));
 
                     TenantBillingLedger::create([
                         'foundation_id'       => $tenant->id,
                         'donation_id'         => $donation->id,
-                        'gross_amount'        => $subscription->amount,
+                        'gross_amount'        => $amountBob,
                         'saas_fee_percentage' => $feePercentage,
                         'saas_fee_amount'     => $settlement['saas_fee_amount'],
                         'billing_period'      => now()->format('Y-m'),

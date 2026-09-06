@@ -75,7 +75,11 @@ class FinancialStatsOverview extends BaseWidget
             ];
         }
 
-        // 1. GMV Total del Mes (Agrupado por moneda)
+        // 1. GMV Total del Mes en base inmutable BOB
+        $totalGmvBobEquiv = (float) Donation::where('status', 'completed')
+            ->where('paid_at', '>=', $currentMonth)
+            ->sum('amount_bob');
+
         $bobGmv = (float) Donation::where('status', 'completed')
             ->where('currency', 'BOB')
             ->where('paid_at', '>=', $currentMonth)
@@ -86,20 +90,10 @@ class FinancialStatsOverview extends BaseWidget
             ->where('paid_at', '>=', $currentMonth)
             ->sum('amount');
 
-        $totalGmvBobEquiv = $bobGmv + ($usdGmv * $exchangeRate);
-
-        // 2. Comisión SaaS (Tu 2% del Mes en BOB)
-        $saasFeeBob = (float) Donation::where('status', 'completed')
-            ->where('currency', 'BOB')
+        // 2. Comisión SaaS (Tu 2% del Mes inmutable en BOB)
+        $totalSaasRevenueBob = (float) Donation::where('status', 'completed')
             ->where('paid_at', '>=', $currentMonth)
             ->sum('saas_fee_amount');
-
-        $saasFeeUsd = (float) Donation::where('status', 'completed')
-            ->where('currency', 'USD')
-            ->where('paid_at', '>=', $currentMonth)
-            ->sum('saas_fee_amount');
-
-        $totalSaasRevenueBob = $saasFeeBob + ($saasFeeUsd * $exchangeRate);
 
         // 3. Estado de Cobranza (Comisiones pendientes en ledgers)
         $pendingCollectionBob = (float) TenantBillingLedger::where('status', 'pending')->sum('saas_fee_amount');

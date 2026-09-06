@@ -35,12 +35,9 @@ class DailyRevenueChart extends ChartWidget
 
         $donations = $query->get();
 
-        $rateService = app(ExchangeRateService::class);
-        $latestRate = $rateService->getLatestConfirmedRate('USD/BOB');
-        $exchangeRate = $latestRate ? (float) $latestRate->sell_rate : $rateService->getCurrentSellRate('USD/BOB');
-
         $dailyGmv = [];
         $dailySaasFee = [];
+        $dailyNet = [];
 
         foreach ($days as $day) {
             $dayDonations = $donations->filter(function ($donation) use ($day) {
@@ -48,16 +45,16 @@ class DailyRevenueChart extends ChartWidget
                 return $date === $day;
             });
 
-            $gmv = $dayDonations->sum(function ($d) use ($exchangeRate) {
-                return $d->currency === 'USD' ? ((float) $d->amount * $exchangeRate) : (float) $d->amount;
+            $gmv = $dayDonations->sum(function ($d) {
+                return (float) ($d->amount_bob ?? $d->amount);
             });
 
-            $saas = $dayDonations->sum(function ($d) use ($exchangeRate) {
-                return $d->currency === 'USD' ? ((float) $d->saas_fee_amount * $exchangeRate) : (float) $d->saas_fee_amount;
+            $saas = $dayDonations->sum(function ($d) {
+                return (float) ($d->saas_fee_amount ?? 0.00);
             });
 
-            $net = $dayDonations->sum(function ($d) use ($exchangeRate) {
-                return $d->currency === 'USD' ? ((float) $d->net_estimated_to_foundation * $exchangeRate) : (float) $d->net_estimated_to_foundation;
+            $net = $dayDonations->sum(function ($d) {
+                return (float) ($d->net_estimated_to_foundation ?? 0.00);
             });
 
             $dailyGmv[] = round($gmv, 2);

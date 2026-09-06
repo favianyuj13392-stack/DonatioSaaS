@@ -10,6 +10,7 @@ use App\Models\Subscription;
 use App\Models\TenantBillingLedger;
 use App\Services\ATC\AtcCybersourceAdapter;
 use App\Services\ATC\AtcQrService;
+use App\Services\ExchangeRate\ExchangeRateService;
 use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -328,8 +329,23 @@ class DonationCheckoutController extends Controller
                     ]);
                 }
 
-                // 4. Calcular comisiones inmutables del tenant
-                $settlement = $tenant->calculateSettlement((float) $validated['amount'], 'card');
+                // 3. Obtener tipo de cambio oficial spot del BCB al momento exacto del cobro
+                $rateService = app(ExchangeRateService::class);
+                $rateBcb = $rateService->getCurrentSellRate('USD/BOB');
+
+                $currency = strtoupper($validated['currency'] ?? 'BOB');
+                $inputAmount = (float) $validated['amount'];
+
+                if ($currency === 'USD') {
+                    $amountUsd = $inputAmount;
+                    $amountBob = round($amountUsd * $rateBcb, 2);
+                } else {
+                    $amountBob = $inputAmount;
+                    $amountUsd = round($amountBob / $rateBcb, 2);
+                }
+
+                // 4. Calcular comisiones inmutables del tenant en base a la moneda nacional (BOB)
+                $settlement = $tenant->calculateSettlement($amountBob, 'card');
 
                 // 5. Guardar Donación
                 $donation = Donation::create([
@@ -341,11 +357,14 @@ class DonationCheckoutController extends Controller
                     'cybersource_request_id'      => $paymentResult['cybersource_request_id'] ?? null,
                     'eci_raw'                     => $paymentResult['eci_raw'] ?? null,
                     'cavv_raw'                    => $paymentResult['cavv_raw'] ?? null,
-                    'amount'                      => $validated['amount'],
+                    'amount'                      => $inputAmount,
+                    'amount_bob'                  => $amountBob,
+                    'amount_usd'                  => $amountUsd,
+                    'exchange_rate_bcb'           => $rateBcb,
                     'saas_fee_amount'             => $settlement['saas_fee_amount'],
                     'atc_fee_estimated_amount'    => $settlement['atc_fee_estimated_amount'],
                     'net_estimated_to_foundation' => $settlement['net_estimated_to_foundation'],
-                    'currency'                    => $validated['currency'] ?? 'BOB',
+                    'currency'                    => $currency,
                     'payment_method'              => 'card',
                     'donation_type'               => $validated['frequency'] === 'monthly' ? 'subscription_initial' : 'single',
                     'status'                      => 'completed',
@@ -356,18 +375,18 @@ class DonationCheckoutController extends Controller
                     'paid_at'                     => now(),
                 ]);
 
-                // 6. Incrementar meta de campaña
+                // 6. Incrementar meta de campaña en moneda nacional (BOB)
                 if ($donation->campaign_id && $donation->campaign) {
-                    $donation->campaign->increment('current_amount', $donation->amount);
+                    $donation->campaign->increment('current_amount', $amountBob);
                 }
 
-                // 7. Registrar comisión SaaS en el ledger
+                // 7. Registrar comisión SaaS en el ledger en base a BOB
                 $feePercentage = (float) ($tenant->saas_fee_card ?? config('donatio.default_saas_fee_card', 2.00));
 
                 TenantBillingLedger::create([
                     'foundation_id'       => $tenant->id,
                     'donation_id'         => $donation->id,
-                    'gross_amount'        => $donation->amount,
+                    'gross_amount'        => $amountBob,
                     'saas_fee_percentage' => $feePercentage,
                     'saas_fee_amount'     => $settlement['saas_fee_amount'],
                     'billing_period'      => now()->format('Y-m'),
@@ -415,8 +434,13 @@ class DonationCheckoutController extends Controller
             );
         }
 
-        // Pre-calcular comisiones de liquidación para QR
-        $settlement = $tenant->calculateSettlement((float) $validated['amount'], 'qr');
+        $rateService = app(ExchangeRateService::class);
+        $rateBcb = $rateService->getCurrentSellRate('USD/BOB');
+        $amountBob = (float) $validated['amount'];
+        $amountUsd = round($amountBob / $rateBcb, 2);
+
+        // Pre-calcular comisiones de liquidación para QR (en BOB)
+        $settlement = $tenant->calculateSettlement($amountBob, 'qr');
 
         // Crear donación pendiente inicial
         $donation = Donation::create([
@@ -424,11 +448,14 @@ class DonationCheckoutController extends Controller
             'donor_id'                    => $donor?->id,
             'campaign_id'                 => $validated['campaign_id'] ?? null,
             'merchant_reference_number'   => 'TEMP-' . uniqid(),
-            'amount'                      => $validated['amount'],
+            'amount'                      => $amountBob,
+            'amount_bob'                  => $amountBob,
+            'amount_usd'                  => $amountUsd,
+            'exchange_rate_bcb'           => $rateBcb,
             'saas_fee_amount'             => $settlement['saas_fee_amount'],
             'atc_fee_estimated_amount'    => $settlement['atc_fee_estimated_amount'],
             'net_estimated_to_foundation' => $settlement['net_estimated_to_foundation'],
-            'currency'                    => $validated['currency'] ?? 'BOB',
+            'currency'                    => 'BOB',
             'payment_method'              => 'qr',
             'donation_type'               => 'single',
             'status'                      => 'pending',
