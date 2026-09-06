@@ -142,7 +142,7 @@ class AtcSignatureService
                 'tenant_id' => $tenant->id,
                 'tenant'    => $tenant->name,
                 'url'       => $url,
-                'payload'   => $payload,
+                'payload'   => self::sanitizePayloadForLogging($payload ?? []),
             ]);
             $errorMessage = $result['message'] ?? ($result['errorInformation']['message'] ?? ($result['reason'] ?? $rawBody));
             throw new Exception("Error Cybersource ({$statusCode}): {$errorMessage}", $statusCode);
@@ -150,4 +150,41 @@ class AtcSignatureService
 
         return $result ?? [];
     }
+
+    /**
+     * Sanitiza el payload para logging eliminando datos sensibles y enmascarando PAN según PCI-DSS v4.0.
+     */
+    private static function sanitizePayloadForLogging(array $payload): array
+    {
+        $sensitiveKeysToOmit = ['securitycode', 'cvv', 'cavv', 'xid'];
+        $cardKeysToMask = ['cardnumber', 'card_number', 'number'];
+
+        $sanitized = [];
+
+        foreach ($payload as $key => $value) {
+            $keyLower = strtolower((string) $key);
+
+            if (in_array($keyLower, $sensitiveKeysToOmit, true)) {
+                continue;
+            }
+
+            if (is_array($value)) {
+                $sanitized[$key] = self::sanitizePayloadForLogging($value);
+            } elseif (in_array($keyLower, $cardKeysToMask, true) && !empty($value)) {
+                $raw = (string) $value;
+                $digits = preg_replace('/\D/', '', $raw);
+                $len = strlen($digits);
+                if ($len >= 10) {
+                    $sanitized[$key] = substr($digits, 0, 6) . str_repeat('*', $len - 10) . substr($digits, -4);
+                } else {
+                    $sanitized[$key] = str_repeat('*', strlen($raw));
+                }
+            } else {
+                $sanitized[$key] = $value;
+            }
+        }
+
+        return $sanitized;
+    }
 }
+

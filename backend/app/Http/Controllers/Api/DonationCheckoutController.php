@@ -15,7 +15,10 @@ use App\Services\ExchangeRate\ExchangeRateService;
 use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\URL;
+
 
 class DonationCheckoutController extends Controller
 {
@@ -280,160 +283,197 @@ class DonationCheckoutController extends Controller
             'accepted_terms'                 => 'nullable|boolean',
         ]);
 
-        $isAnonymous = $validated['is_anonymous'] ?? false;
-        $donor = null;
+        $merchantRef = $validated['merchant_reference_number'];
+        $lock = Cache::lock("checkout:lock:{$merchantRef}", 45);
 
-        // 1. Crear o buscar Donante si no es anónimo
-        if (!$isAnonymous && !empty($validated['donor_email'])) {
-            $donor = Donor::firstOrCreate(
-                ['foundation_id' => $tenant->id, 'email' => $validated['donor_email']],
-                ['name' => $validated['donor_name'] ?? 'Donante', 'phone' => $request->input('donor_phone')]
-            );
+        if (!$lock->get()) {
+            return response()->json([
+                'error'   => 'Transacción en proceso. Por favor espere.',
+                'message' => 'Transacción en proceso. Por favor espere.',
+            ], 409);
         }
 
         try {
-            return DB::transaction(function () use ($validated, $tenant, $donor, $gateway, $isAnonymous, $request) {
-                // 1. Procesar captura en Cybersource (/pts/v2/payments) con TOKEN_CREATE automático si es recurrente
-                $paymentResult = $gateway->processCheckout($tenant, $validated);
+            $existingDonation = Donation::where('merchant_reference_number', $merchantRef)->first();
+            if ($existingDonation && $existingDonation->status === 'completed') {
+                return response()->json([
+                    'status'                    => 'already_completed',
+                    'message'                   => 'Esta donación ya fue procesada anteriormente.',
+                    'donation_id'               => $existingDonation->id,
+                    'merchant_reference_number' => $existingDonation->merchant_reference_number,
+                    'receipt_url'               => URL::temporarySignedRoute(
+                        'donations.receipt',
+                        now()->addDays(30),
+                        ['id' => $existingDonation->id]
+                    ),
+                ]);
+            }
 
-                if (($paymentResult['status'] ?? '') !== 'completed') {
-                    throw new Exception('El banco rechazó la transacción de pago.');
-                }
+            $isAnonymous = $validated['is_anonymous'] ?? false;
+            $donor = null;
 
-                $rawResponse = $paymentResult['raw_gateway_response'] ?? [];
-                $tokenInfo = $rawResponse['tokenInformation'] ?? [];
-                $paymentInstrumentId = $tokenInfo['instrumentIdentifier']['id'] ?? ($tokenInfo['paymentInstrument']['id'] ?? null);
-                $customerId = $tokenInfo['customer']['id'] ?? null;
-                $cardLastFour = substr($validated['card_number'] ?? '0000', -4);
-                $cardBrand = strtoupper($validated['card_type'] ?? 'VISA');
+            // 1. Crear o buscar Donante si no es anónimo
+            if (!$isAnonymous && !empty($validated['donor_email'])) {
+                $donor = Donor::firstOrCreate(
+                    ['foundation_id' => $tenant->id, 'email' => $validated['donor_email']],
+                    ['name' => $validated['donor_name'] ?? 'Donante', 'phone' => $request->input('donor_phone')]
+                );
+            }
 
-                $subscription = null;
+            try {
+                return DB::transaction(function () use ($validated, $tenant, $donor, $gateway, $isAnonymous, $request) {
+                    // 1. Procesar captura en Cybersource (/pts/v2/payments) con TOKEN_CREATE automático si es recurrente
+                    $paymentResult = $gateway->processCheckout($tenant, $validated);
 
-                // 2. Si es recurrente, crear la Suscripción con el token TMS retornado por Cybersource
-                if ($validated['frequency'] === 'monthly') {
-                    $subscription = Subscription::create([
+                    if (($paymentResult['status'] ?? '') !== 'completed') {
+                        throw new Exception('El banco rechazó la transacción de pago.');
+                    }
+
+                    $rawResponse = $paymentResult['raw_gateway_response'] ?? [];
+                    $tokenInfo = $rawResponse['tokenInformation'] ?? [];
+                    $paymentInstrumentId = $tokenInfo['instrumentIdentifier']['id'] ?? ($tokenInfo['paymentInstrument']['id'] ?? null);
+                    $customerId = $tokenInfo['customer']['id'] ?? null;
+                    $cardLastFour = substr($validated['card_number'] ?? '0000', -4);
+                    $cardBrand = strtoupper($validated['card_type'] ?? 'VISA');
+
+                    $subscription = null;
+
+                    // 2. Si es recurrente, crear la Suscripción con el token TMS retornado por Cybersource
+                    if ($validated['frequency'] === 'monthly') {
+                        $subscription = Subscription::create([
+                            'foundation_id'             => $tenant->id,
+                            'donor_id'                  => $donor?->id,
+                            'campaign_id'               => $validated['campaign_id'] ?? null,
+                            'amount'                    => $validated['amount'],
+                            'currency'                  => $validated['currency'] ?? 'BOB',
+                            'tms_customer_id'           => $customerId,
+                            'tms_payment_instrument_id' => $paymentInstrumentId,
+                            'card_last_four'            => $cardLastFour,
+                            'card_brand'                => $cardBrand,
+                            'billing_day_of_month'      => (int) now()->format('d'),
+                            'next_billing_date'         => now()->addMonth()->toDateString(),
+                            'last_billed_at'            => now(),
+                            'ip_address'                => $request->ip(),
+                            'user_agent'                => $request->userAgent(),
+                            'accepted_terms_at'         => now(),
+                            'status'                    => 'active',
+                        ]);
+                    }
+
+                    // 3. Obtener tipo de cambio oficial spot del BCB al momento exacto del cobro
+                    $rateService = app(ExchangeRateService::class);
+                    $rateBcb = $rateService->getCurrentSellRate('USD/BOB');
+
+                    $currency = strtoupper($validated['currency'] ?? 'BOB');
+                    $inputAmount = (float) $validated['amount'];
+
+                    if ($currency === 'USD') {
+                        $amountUsd = $inputAmount;
+                        $amountBob = round($amountUsd * $rateBcb, 2);
+                    } else {
+                        $amountBob = $inputAmount;
+                        $amountUsd = round($amountBob / $rateBcb, 2);
+                    }
+
+                    // 4. Calcular comisiones inmutables del tenant en base a la moneda nacional (BOB)
+                    $settlement = $tenant->calculateSettlement($amountBob, 'card');
+
+                    // 5. Guardar Donación
+                    $donation = Donation::create([
+                        'foundation_id'               => $tenant->id,
+                        'donor_id'                    => $donor?->id,
+                        'campaign_id'                 => $validated['campaign_id'] ?? null,
+                        'subscription_id'             => $subscription?->id,
+                        'merchant_reference_number'   => $validated['merchant_reference_number'],
+                        'cybersource_request_id'      => $paymentResult['cybersource_request_id'] ?? null,
+                        'eci_raw'                     => $paymentResult['eci_raw'] ?? null,
+                        'cavv_raw'                    => $paymentResult['cavv_raw'] ?? null,
+                        'amount'                      => $inputAmount,
+                        'amount_bob'                  => $amountBob,
+                        'amount_usd'                  => $amountUsd,
+                        'exchange_rate_bcb'           => $rateBcb,
+                        'saas_fee_amount'             => $settlement['saas_fee_amount'],
+                        'atc_fee_estimated_amount'    => $settlement['atc_fee_estimated_amount'],
+                        'net_estimated_to_foundation' => $settlement['net_estimated_to_foundation'],
+                        'currency'                    => $currency,
+                        'payment_method'              => 'card',
+                        'donation_type'               => $validated['frequency'] === 'monthly' ? 'subscription_initial' : 'single',
+                        'status'                      => 'completed',
+                        'is_anonymous'                => $isAnonymous,
+                        'ip_address'                  => $request->ip(),
+                        'user_agent'                  => $request->userAgent(),
+                        'raw_gateway_response'        => $paymentResult['raw_gateway_response'] ?? null,
+                        'paid_at'                     => now(),
+                    ]);
+
+                    // 6. Incrementar meta de campaña en moneda nacional (BOB)
+                    if ($donation->campaign_id && $donation->campaign) {
+                        $donation->campaign->increment('current_amount', $amountBob);
+                    }
+
+                    // 7. Registrar comisión SaaS en el ledger en base a BOB
+                    $feePercentage = (float) ($tenant->saas_fee_card ?? config('donatio.default_saas_fee_card', 2.00));
+
+                    TenantBillingLedger::create([
+                        'foundation_id'       => $tenant->id,
+                        'donation_id'         => $donation->id,
+                        'gross_amount'        => $amountBob,
+                        'saas_fee_percentage' => $feePercentage,
+                        'saas_fee_amount'     => $settlement['saas_fee_amount'],
+                        'billing_period'      => now()->format('Y-m'),
+                        'status'              => 'pending',
+                    ]);
+
+                    // 8. Registrar auditoría criptográfica Clickwrap de no repudio
+                    $consentPayload = implode('|', [
+                        $tenant->id,
+                        $donor?->id ?? 'ANON',
+                        $donation->id,
+                        $donation->merchant_reference_number,
+                        $request->ip(),
+                        substr($request->userAgent() ?? 'Unknown', 0, 150),
+                        'v1.0-2026',
+                        now()->toIso8601String(),
+                        config('app.key'),
+                    ]);
+
+                    DonorConsentLog::create([
                         'foundation_id'             => $tenant->id,
                         'donor_id'                  => $donor?->id,
-                        'campaign_id'               => $validated['campaign_id'] ?? null,
-                        'amount'                    => $validated['amount'],
-                        'currency'                  => $validated['currency'] ?? 'BOB',
-                        'tms_customer_id'           => $customerId,
-                        'tms_payment_instrument_id' => $paymentInstrumentId,
-                        'card_last_four'            => $cardLastFour,
-                        'card_brand'                => $cardBrand,
-                        'billing_day_of_month'      => (int) now()->format('d'),
-                        'next_billing_date'         => now()->addMonth()->toDateString(),
-                        'last_billed_at'            => now(),
+                        'donation_id'               => $donation->id,
+                        'merchant_reference_number' => $donation->merchant_reference_number,
                         'ip_address'                => $request->ip(),
-                        'user_agent'                => $request->userAgent(),
-                        'accepted_terms_at'         => now(),
-                        'status'                    => 'active',
+                        'user_agent'                => $request->userAgent() ?? 'Unknown',
+                        'tos_version'               => 'v1.0-2026',
+                        'privacy_policy_version'    => 'v1.0-2026',
+                        'consent_given_at'          => now(),
+                        'consent_signature_hash'    => hash('sha256', $consentPayload),
                     ]);
-                }
 
-                // 3. Obtener tipo de cambio oficial spot del BCB al momento exacto del cobro
-                $rateService = app(ExchangeRateService::class);
-                $rateBcb = $rateService->getCurrentSellRate('USD/BOB');
-
-                $currency = strtoupper($validated['currency'] ?? 'BOB');
-                $inputAmount = (float) $validated['amount'];
-
-                if ($currency === 'USD') {
-                    $amountUsd = $inputAmount;
-                    $amountBob = round($amountUsd * $rateBcb, 2);
-                } else {
-                    $amountBob = $inputAmount;
-                    $amountUsd = round($amountBob / $rateBcb, 2);
-                }
-
-                // 4. Calcular comisiones inmutables del tenant en base a la moneda nacional (BOB)
-                $settlement = $tenant->calculateSettlement($amountBob, 'card');
-
-                // 5. Guardar Donación
-                $donation = Donation::create([
-                    'foundation_id'               => $tenant->id,
-                    'donor_id'                    => $donor?->id,
-                    'campaign_id'                 => $validated['campaign_id'] ?? null,
-                    'subscription_id'             => $subscription?->id,
-                    'merchant_reference_number'   => $validated['merchant_reference_number'],
-                    'cybersource_request_id'      => $paymentResult['cybersource_request_id'] ?? null,
-                    'eci_raw'                     => $paymentResult['eci_raw'] ?? null,
-                    'cavv_raw'                    => $paymentResult['cavv_raw'] ?? null,
-                    'amount'                      => $inputAmount,
-                    'amount_bob'                  => $amountBob,
-                    'amount_usd'                  => $amountUsd,
-                    'exchange_rate_bcb'           => $rateBcb,
-                    'saas_fee_amount'             => $settlement['saas_fee_amount'],
-                    'atc_fee_estimated_amount'    => $settlement['atc_fee_estimated_amount'],
-                    'net_estimated_to_foundation' => $settlement['net_estimated_to_foundation'],
-                    'currency'                    => $currency,
-                    'payment_method'              => 'card',
-                    'donation_type'               => $validated['frequency'] === 'monthly' ? 'subscription_initial' : 'single',
-                    'status'                      => 'completed',
-                    'is_anonymous'                => $isAnonymous,
-                    'ip_address'                  => $request->ip(),
-                    'user_agent'                  => $request->userAgent(),
-                    'raw_gateway_response'        => $paymentResult['raw_gateway_response'] ?? null,
-                    'paid_at'                     => now(),
-                ]);
-
-                // 6. Incrementar meta de campaña en moneda nacional (BOB)
-                if ($donation->campaign_id && $donation->campaign) {
-                    $donation->campaign->increment('current_amount', $amountBob);
-                }
-
-                // 7. Registrar comisión SaaS en el ledger en base a BOB
-                $feePercentage = (float) ($tenant->saas_fee_card ?? config('donatio.default_saas_fee_card', 2.00));
-
-                TenantBillingLedger::create([
-                    'foundation_id'       => $tenant->id,
-                    'donation_id'         => $donation->id,
-                    'gross_amount'        => $amountBob,
-                    'saas_fee_percentage' => $feePercentage,
-                    'saas_fee_amount'     => $settlement['saas_fee_amount'],
-                    'billing_period'      => now()->format('Y-m'),
-                    'status'              => 'pending',
-                ]);
-
-                // 8. Registrar auditoría criptográfica Clickwrap de no repudio
-                $consentPayload = implode('|', [
-                    $tenant->id,
-                    $donor?->id ?? 'ANON',
-                    $donation->id,
-                    $donation->merchant_reference_number,
-                    $request->ip(),
-                    substr($request->userAgent() ?? 'Unknown', 0, 150),
-                    'v1.0-2026',
-                    now()->toIso8601String(),
-                    config('app.key'),
-                ]);
-
-                DonorConsentLog::create([
-                    'foundation_id'             => $tenant->id,
-                    'donor_id'                  => $donor?->id,
-                    'donation_id'               => $donation->id,
-                    'merchant_reference_number' => $donation->merchant_reference_number,
-                    'ip_address'                => $request->ip(),
-                    'user_agent'                => $request->userAgent() ?? 'Unknown',
-                    'tos_version'               => 'v1.0-2026',
-                    'privacy_policy_version'    => 'v1.0-2026',
-                    'consent_given_at'          => now(),
-                    'consent_signature_hash'    => hash('sha256', $consentPayload),
-                ]);
-
+                    return response()->json([
+                        'status'                    => 'success',
+                        'message'                   => '¡Donación procesada exitosamente! Muchas gracias por tu generosidad.',
+                        'donation_id'               => $donation->id,
+                        'merchant_reference_number' => $donation->merchant_reference_number,
+                        'receipt_url'               => URL::temporarySignedRoute(
+                            'donations.receipt',
+                            now()->addDays(30),
+                            ['id' => $donation->id]
+                        ),
+                    ]);
+                });
+            } catch (Exception $e) {
                 return response()->json([
-                    'status'                    => 'success',
-                    'message'                   => '¡Donación procesada exitosamente! Muchas gracias por tu generosidad.',
-                    'donation_id'               => $donation->id,
-                    'merchant_reference_number' => $donation->merchant_reference_number,
-                    'receipt_url'               => url("/api/v1/donations/{$donation->id}/receipt"),
-                ]);
-            });
-        } catch (Exception $e) {
-            return response()->json([
-                'error'   => 'PaymentProcessingError',
-                'message' => $e->getMessage(),
-            ], 422);
+                    'error'   => 'PaymentProcessingError',
+                    'message' => $e->getMessage(),
+                ], 422);
+            }
+        } finally {
+            try {
+                $lock->release();
+            } catch (\Throwable $e) {
+                // Ignore lock release failures
+            }
         }
     }
 
@@ -443,6 +483,11 @@ class DonationCheckoutController extends Controller
      */
     public function generateQr(Request $request): JsonResponse
     {
+        return response()->json([
+            'error'  => 'Canal QR en pausa pendiente de certificación bancaria.',
+            'status' => 'inactive',
+        ], 503);
+
         $tenant = app('current_tenant');
 
         $validated = $request->validate([
@@ -537,7 +582,9 @@ class DonationCheckoutController extends Controller
             'donation_id' => $donation->id,
             'status'      => $donation->status,
             'paid_at'     => $donation->paid_at,
-            'receipt_url' => $donation->status === 'completed' ? url("/api/v1/donations/{$donation->id}/receipt") : null,
+            'receipt_url' => $donation->status === 'completed'
+                ? URL::temporarySignedRoute('donations.receipt', now()->addDays(30), ['id' => $donation->id])
+                : null,
         ]);
     }
 

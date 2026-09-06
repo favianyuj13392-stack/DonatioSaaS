@@ -19,7 +19,13 @@ class QrWebhookController extends Controller
      */
     public function handle(Request $request): JsonResponse
     {
+        return response()->json([
+            'error'  => 'Canal QR en pausa pendiente de certificación bancaria.',
+            'status' => 'inactive',
+        ], 503);
+
         $merchantRef = $request->input('merchant_reference_number') ?? $request->input('reference');
+
 
         if (!$merchantRef) {
             return response()->json(['error' => 'Referencia bancaria faltante'], 400);

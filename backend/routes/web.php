@@ -11,14 +11,8 @@ Route::get('/', function () {
     ]);
 });
 
-Route::get('/dev/migrate-and-seed', function () {
-    \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
-    \Illuminate\Support\Facades\Artisan::call('db:seed', ['--force' => true]);
-    return response()->json([
-        'status' => 'success',
-        'output' => \Illuminate\Support\Facades\Artisan::output(),
-    ]);
+Route::middleware(['auth'])->group(function () {
+    Route::get('/admin/billing/proforma/{period}/{foundation_id}', [BillingProformaController::class, 'show'])
+        ->name('admin.billing.proforma');
 });
 
-Route::get('/admin/billing/proforma/{period}/{foundation_id}', [BillingProformaController::class, 'show'])
-    ->name('admin.billing.proforma');
