@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Campaign;
 use App\Models\Donation;
 use App\Models\Donor;
+use App\Models\DonorConsentLog;
 use App\Models\Subscription;
 use App\Models\TenantBillingLedger;
 use App\Services\ATC\AtcCybersourceAdapter;
@@ -276,6 +277,7 @@ class DonationCheckoutController extends Controller
             'eci_raw'                        => 'nullable|string',
             'xid'                            => 'nullable|string',
             'three_ds_server_transaction_id' => 'nullable|string',
+            'accepted_terms'                 => 'nullable|boolean',
         ]);
 
         $isAnonymous = $validated['is_anonymous'] ?? false;
@@ -393,6 +395,32 @@ class DonationCheckoutController extends Controller
                     'status'              => 'pending',
                 ]);
 
+                // 8. Registrar auditoría criptográfica Clickwrap de no repudio
+                $consentPayload = implode('|', [
+                    $tenant->id,
+                    $donor?->id ?? 'ANON',
+                    $donation->id,
+                    $donation->merchant_reference_number,
+                    $request->ip(),
+                    substr($request->userAgent() ?? 'Unknown', 0, 150),
+                    'v1.0-2026',
+                    now()->toIso8601String(),
+                    config('app.key'),
+                ]);
+
+                DonorConsentLog::create([
+                    'foundation_id'             => $tenant->id,
+                    'donor_id'                  => $donor?->id,
+                    'donation_id'               => $donation->id,
+                    'merchant_reference_number' => $donation->merchant_reference_number,
+                    'ip_address'                => $request->ip(),
+                    'user_agent'                => $request->userAgent() ?? 'Unknown',
+                    'tos_version'               => 'v1.0-2026',
+                    'privacy_policy_version'    => 'v1.0-2026',
+                    'consent_given_at'          => now(),
+                    'consent_signature_hash'    => hash('sha256', $consentPayload),
+                ]);
+
                 return response()->json([
                     'status'                    => 'success',
                     'message'                   => '¡Donación procesada exitosamente! Muchas gracias por tu generosidad.',
@@ -418,12 +446,13 @@ class DonationCheckoutController extends Controller
         $tenant = app('current_tenant');
 
         $validated = $request->validate([
-            'campaign_id'  => 'nullable|exists:campaigns,id',
-            'amount'       => 'required|numeric|min:1',
-            'currency'     => 'nullable|string|size:3',
-            'donor_name'   => 'nullable|string',
-            'donor_email'  => 'nullable|email',
-            'is_anonymous' => 'boolean',
+            'campaign_id'    => 'nullable|exists:campaigns,id',
+            'amount'         => 'required|numeric|min:1',
+            'currency'       => 'nullable|string|size:3',
+            'donor_name'     => 'nullable|string',
+            'donor_email'    => 'nullable|email',
+            'is_anonymous'   => 'boolean',
+            'accepted_terms' => 'nullable|boolean',
         ]);
 
         $donor = null;
@@ -460,6 +489,32 @@ class DonationCheckoutController extends Controller
             'donation_type'               => 'single',
             'status'                      => 'pending',
             'is_anonymous'                => $validated['is_anonymous'] ?? false,
+        ]);
+
+        // Registrar auditoría criptográfica Clickwrap de no repudio para QR
+        $consentPayload = implode('|', [
+            $tenant->id,
+            $donor?->id ?? 'ANON',
+            $donation->id,
+            $donation->merchant_reference_number,
+            $request->ip(),
+            substr($request->userAgent() ?? 'Unknown', 0, 150),
+            'v1.0-2026',
+            now()->toIso8601String(),
+            config('app.key'),
+        ]);
+
+        DonorConsentLog::create([
+            'foundation_id'             => $tenant->id,
+            'donor_id'                  => $donor?->id,
+            'donation_id'               => $donation->id,
+            'merchant_reference_number' => $donation->merchant_reference_number,
+            'ip_address'                => $request->ip(),
+            'user_agent'                => $request->userAgent() ?? 'Unknown',
+            'tos_version'               => 'v1.0-2026',
+            'privacy_policy_version'    => 'v1.0-2026',
+            'consent_given_at'          => now(),
+            'consent_signature_hash'    => hash('sha256', $consentPayload),
         ]);
 
         $qrPayload = AtcQrService::generateQr($tenant, $donation);

@@ -6,6 +6,7 @@ import { DonationSuccessModal } from './DonationSuccessModal';
 import { ThreatMetrixScript } from './ThreatMetrixScript';
 import { CardinalDataCollector } from './CardinalDataCollector';
 import { StepUpChallengeModal } from './StepUpChallengeModal';
+import { LegalTermsModal } from './LegalTermsModal';
 import {
   generateQrDonation,
   setup3dsSession,
@@ -100,6 +101,16 @@ export const DonationCheckoutContainer: React.FC = () => {
     referenceNumber: string;
     receiptUrl: string | null;
   } | null>(null);
+
+  // Clickwrap Legal & Privacidad
+  const [acceptedTerms, setAcceptedTerms] = useState<boolean>(false);
+  const [isLegalModalOpen, setIsLegalModalOpen] = useState<boolean>(false);
+  const [legalModalTab, setLegalModalTab] = useState<'terms' | 'privacy'>('terms');
+
+  const handleOpenLegalModal = (tab: 'terms' | 'privacy') => {
+    setLegalModalTab(tab);
+    setIsLegalModalOpen(true);
+  };
 
   // Sincronizar frecuencia si la campaña cambia
   useEffect(() => {
@@ -219,6 +230,11 @@ export const DonationCheckoutContainer: React.FC = () => {
     e.preventDefault();
     setErrorMessage(null);
 
+    if (!acceptedTerms) {
+      setErrorMessage('Debes aceptar los Términos y Condiciones y la Política de Privacidad para continuar.');
+      return;
+    }
+
     if (currentAmount <= 0) {
       setErrorMessage('Por favor selecciona o ingresa un monto válido.');
       return;
@@ -240,6 +256,7 @@ export const DonationCheckoutContainer: React.FC = () => {
           donor_name: isAnonymous ? 'Donante Anónimo' : donorName,
           donor_email: isAnonymous ? 'anonimo@donatio.lat' : donorEmail,
           is_anonymous: isAnonymous,
+          accepted_terms: true,
         });
 
         setQrModalData(qrRes);
@@ -385,6 +402,17 @@ export const DonationCheckoutContainer: React.FC = () => {
           onClose={() => setSuccessModalData(null)}
         />
       )}
+
+      <LegalTermsModal
+        isOpen={isLegalModalOpen}
+        tenant={tenant}
+        initialTab={legalModalTab}
+        onClose={() => setIsLegalModalOpen(false)}
+        onAccept={() => {
+          setAcceptedTerms(true);
+          setIsLegalModalOpen(false);
+        }}
+      />
 
       {/* ========================================================================= */}
       {/* HERO SPLIT: 60% HISTORIA EMOCIONAL / 40% CARD DE DONACIÓN FLOTANTE STICKY */}
@@ -725,12 +753,52 @@ export const DonationCheckoutContainer: React.FC = () => {
                 />
               )}
 
+              {/* Checkbox Clickwrap de Consentimiento Legal Obligatorio */}
+              <div className="pt-2 pb-1">
+                <label className="flex items-start gap-2.5 cursor-pointer select-none group">
+                  <input
+                    type="checkbox"
+                    checked={acceptedTerms}
+                    onChange={(e) => setAcceptedTerms(e.target.checked)}
+                    className="mt-0.5 rounded text-[var(--tenant-primary)] focus:ring-[var(--tenant-primary)] w-4 h-4 border-slate-300 transition cursor-pointer"
+                    required
+                  />
+                  <span className="text-[11px] sm:text-xs text-slate-600 leading-snug">
+                    He leído y acepto expresamente los{' '}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleOpenLegalModal('terms');
+                      }}
+                      className="font-bold text-[var(--tenant-primary)] hover:underline focus:outline-none"
+                    >
+                      Términos y Condiciones Clickwrap
+                    </button>{' '}
+                    y la{' '}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleOpenLegalModal('privacy');
+                      }}
+                      className="font-bold text-[var(--tenant-primary)] hover:underline focus:outline-none"
+                    >
+                      Política de Privacidad
+                    </button>
+                    .
+                  </span>
+                </label>
+              </div>
+
               {/* 6. Botón Principal CTA con Microinteracción */}
               <button
                 type="submit"
-                disabled={isSubmitting || currentAmount <= 0}
+                disabled={isSubmitting || currentAmount <= 0 || !acceptedTerms}
                 className={`w-full py-4 rounded-2xl font-black text-base sm:text-lg text-white shadow-xl transition-all duration-200 flex items-center justify-center gap-2 ${
-                  isSubmitting || currentAmount <= 0
+                  isSubmitting || currentAmount <= 0 || !acceptedTerms
                     ? 'opacity-60 cursor-not-allowed bg-slate-400'
                     : 'bg-[var(--tenant-primary)] hover:scale-[1.02] active:scale-[0.98] hover:shadow-2xl'
                 }`}
