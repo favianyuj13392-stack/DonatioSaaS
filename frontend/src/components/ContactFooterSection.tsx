@@ -1,9 +1,18 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useTenant } from '../context/TenantContext';
-import { Mail, Phone, MapPin, ShieldCheck, Lock, CreditCard, QrCode } from 'lucide-react';
+import { Mail, Phone, MapPin, ShieldCheck, Lock, CreditCard, QrCode, FileText } from 'lucide-react';
+import { LegalTermsModal } from './LegalTermsModal';
 
 export const ContactFooterSection: React.FC = () => {
   const { tenant, navigateToHome, navigateToCampaigns, paymentProviders } = useTenant();
+
+  const [isLegalModalOpen, setIsLegalModalOpen] = useState(false);
+  const [legalModalTab, setLegalModalTab] = useState<'terms' | 'privacy'>('terms');
+
+  const handleOpenLegalModal = (tab: 'terms' | 'privacy') => {
+    setLegalModalTab(tab);
+    setIsLegalModalOpen(true);
+  };
 
   if (!tenant) return null;
 
@@ -121,6 +130,26 @@ export const ContactFooterSection: React.FC = () => {
               <li className="pt-2 text-[11px] text-slate-500">
                 Entidad legalmente constituida y habilitada para recaudación de fondos solidarios.
               </li>
+              <li className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => handleOpenLegalModal('terms')}
+                  className="flex items-center gap-1.5 text-slate-300 hover:text-white transition-colors text-left font-medium"
+                >
+                  <FileText className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+                  <span>Términos y Condiciones (Clickwrap)</span>
+                </button>
+              </li>
+              <li>
+                <button
+                  type="button"
+                  onClick={() => handleOpenLegalModal('privacy')}
+                  className="flex items-center gap-1.5 text-slate-300 hover:text-white transition-colors text-left font-medium"
+                >
+                  <Lock className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                  <span>Tratamiento de Datos Personales</span>
+                </button>
+              </li>
             </ul>
           </div>
 
@@ -183,10 +212,26 @@ export const ContactFooterSection: React.FC = () => {
 
         </div>
 
-        {/* Sub-footer con Créditos */}
+        {/* Sub-footer con Créditos y Enlaces Legales */}
         <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-[11px] text-slate-500">
-          <div>
-            © {new Date().getFullYear()} {tenant.name}. Todos los derechos reservados.
+          <div className="flex flex-wrap items-center gap-3">
+            <span>© {new Date().getFullYear()} {tenant.name}. Todos los derechos reservados.</span>
+            <span>•</span>
+            <button
+              type="button"
+              onClick={() => handleOpenLegalModal('terms')}
+              className="hover:text-slate-300 transition-colors underline"
+            >
+              Términos de Uso (Clickwrap)
+            </button>
+            <span>•</span>
+            <button
+              type="button"
+              onClick={() => handleOpenLegalModal('privacy')}
+              className="hover:text-slate-300 transition-colors underline"
+            >
+              Política de Privacidad
+            </button>
           </div>
           <div className="flex items-center gap-1.5 text-slate-400">
             <span>Plataforma de Fundraising Multi-Tenant</span>
@@ -196,6 +241,14 @@ export const ContactFooterSection: React.FC = () => {
         </div>
 
       </div>
+
+      {/* Modal Flotante de Términos y Privacidad */}
+      <LegalTermsModal
+        isOpen={isLegalModalOpen}
+        tenant={tenant}
+        initialTab={legalModalTab}
+        onClose={() => setIsLegalModalOpen(false)}
+      />
     </footer>
   );
 };

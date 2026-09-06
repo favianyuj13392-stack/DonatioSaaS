@@ -6,6 +6,7 @@ import { DonationSuccessModal } from './DonationSuccessModal';
 import { ThreatMetrixScript } from './ThreatMetrixScript';
 import { CardinalDataCollector } from './CardinalDataCollector';
 import { StepUpChallengeModal } from './StepUpChallengeModal';
+import { LegalTermsModal } from './LegalTermsModal';
 import {
   generateQrDonation,
   setup3dsSession,
@@ -93,6 +94,16 @@ export const DonationWidget: React.FC = () => {
     receiptUrl: string | null;
   } | null>(null);
 
+  // Clickwrap Legal & Privacidad
+  const [acceptedTerms, setAcceptedTerms] = useState<boolean>(false);
+  const [isLegalModalOpen, setIsLegalModalOpen] = useState<boolean>(false);
+  const [legalModalTab, setLegalModalTab] = useState<'terms' | 'privacy'>('terms');
+
+  const handleOpenLegalModal = (tab: 'terms' | 'privacy') => {
+    setLegalModalTab(tab);
+    setIsLegalModalOpen(true);
+  };
+
   // Sincronizar frecuencia si la campaña impone restricciones
   useEffect(() => {
     if (campaign?.allowed_frequencies === 'monthly_only') {
@@ -126,6 +137,11 @@ export const DonationWidget: React.FC = () => {
 
   // Validaciones del formulario
   const validateForm = (): boolean => {
+    if (!acceptedTerms) {
+      setErrorMessage('Debes aceptar los Términos y Condiciones y la Política de Privacidad para continuar.');
+      return false;
+    }
+
     if (currentAmount <= 0) {
       setErrorMessage('Por favor selecciona o ingresa un monto válido.');
       return false;
@@ -377,6 +393,18 @@ export const DonationWidget: React.FC = () => {
         />
       )}
 
+      {/* Modal Clickwrap de Términos y Política de Privacidad */}
+      <LegalTermsModal
+        isOpen={isLegalModalOpen}
+        tenant={tenant}
+        initialTab={legalModalTab}
+        onClose={() => setIsLegalModalOpen(false)}
+        onAccept={() => {
+          setAcceptedTerms(true);
+          setIsLegalModalOpen(false);
+        }}
+      />
+
       {/* CONTENEDOR PRINCIPAL 2 COLUMNAS (MOCKUP CERTIFICADO) */}
       <div className="bg-white rounded-3xl shadow-2xl border border-gray-100 overflow-hidden grid grid-cols-1 md:grid-cols-12">
         
@@ -553,11 +581,51 @@ export const DonationWidget: React.FC = () => {
             </div>
           )}
 
+          {/* Checkbox Clickwrap de Consentimiento Legal Obligatorio */}
+          <div className="pt-2 pb-1">
+            <label className="flex items-start gap-2.5 cursor-pointer select-none group">
+              <input
+                type="checkbox"
+                checked={acceptedTerms}
+                onChange={(e) => setAcceptedTerms(e.target.checked)}
+                className="mt-0.5 rounded text-[var(--tenant-primary)] focus:ring-[var(--tenant-primary)] w-4 h-4 border-gray-300 transition cursor-pointer"
+                required
+              />
+              <span className="text-[11px] sm:text-xs text-gray-600 leading-snug">
+                He leído y acepto los{' '}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleOpenLegalModal('terms');
+                  }}
+                  className="font-bold text-[var(--tenant-primary)] hover:underline focus:outline-none"
+                >
+                  Términos y Condiciones Clickwrap
+                </button>{' '}
+                y la{' '}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleOpenLegalModal('privacy');
+                  }}
+                  className="font-bold text-[var(--tenant-primary)] hover:underline focus:outline-none"
+                >
+                  Política de Privacidad
+                </button>
+                .
+              </span>
+            </label>
+          </div>
+
           {/* CTA Principal de Pago */}
           <button
             type="button"
             onClick={handleProcessDonation}
-            disabled={isSubmitting}
+            disabled={isSubmitting || !acceptedTerms}
             style={{
               backgroundColor: 'var(--tenant-primary)',
               color: 'var(--tenant-on-primary)',
