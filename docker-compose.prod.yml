@@ -17,7 +17,7 @@ services:
       donatio_postgres:
         condition: service_healthy
       donatio_redis:
-        condition: service_started
+        condition: service_healthy
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=proxy"
@@ -67,7 +67,7 @@ services:
       donatio_postgres:
         condition: service_healthy
       donatio_redis:
-        condition: service_started
+        condition: service_healthy
 
   # 4. Laravel Scheduler (Sincronización BCB y Facturación Recurrente)
   donatio_scheduler:
@@ -87,7 +87,7 @@ services:
       donatio_postgres:
         condition: service_healthy
       donatio_redis:
-        condition: service_started
+        condition: service_healthy
 
   # 5. Base de Datos Aislada PostgreSQL 16 (Row Level Security)
   donatio_postgres:
@@ -116,11 +116,16 @@ services:
     image: redis:7-alpine
     container_name: donatio_redis
     restart: unless-stopped
-    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    command: redis-server --requirepass ${REDIS_PASSWORD:-Donatio_Redis_2026_SecureKey!} --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
     volumes:
       - donatio_redisdata_prod:/data
     networks:
       - donatio_net
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-Donatio_Redis_2026_SecureKey!}", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
 networks:
   donatio_net:

@@ -48,7 +48,7 @@ services:
       POSTGRES_USER: donatio_user
       POSTGRES_PASSWORD: secret_donatio_pass
     ports:
-      - "5433:5432"
+      - "127.0.0.1:5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     networks:
@@ -59,7 +59,7 @@ services:
     container_name: donatio_redis
     restart: unless-stopped
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     volumes:
       - redisdata:/data
     networks:
@@ -82,10 +82,10 @@ services:
       - REDIS_HOST=donatio_redis
       - REDIS_PORT=6379
       - QUEUE_CONNECTION=redis
-      - CLOUDINARY_CLOUD_NAME=dgbgzj0t8
-      - CLOUDINARY_API_KEY=416823895637551
-      - CLOUDINARY_API_SECRET=UNAaguJXL8pXDIr32iQbUVCSup8
-      - CLOUDINARY_URL=cloudinary://416823895637551:UNAaguJXL8pXDIr32iQbUVCSup8@dgbgzj0t8
+      - CLOUDINARY_CLOUD_NAME=${CLOUDINARY_CLOUD_NAME:-}
+      - CLOUDINARY_API_KEY=${CLOUDINARY_API_KEY:-}
+      - CLOUDINARY_API_SECRET=${CLOUDINARY_API_SECRET:-}
+      - CLOUDINARY_URL=${CLOUDINARY_URL:-}
     volumes:
       - ./backend:/app
     networks:

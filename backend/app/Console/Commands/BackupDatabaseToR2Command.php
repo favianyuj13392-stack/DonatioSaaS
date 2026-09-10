@@ -27,7 +27,7 @@ class BackupDatabaseToR2Command extends Command
         $this->info('Iniciando volcado de base de datos PostgreSQL 16 para Cloudflare R2...');
 
         $timestamp = now()->format('Y-m-d_His');
-        $filename = "backup_donatio_saas_{$timestamp}.sql.gz";
+        $filename = "backup_donatio_saas_{$timestamp}.sql.gz.enc";
         $tempPath = storage_path("app/{$filename}");
 
         $host = config('database.connections.pgsql.host');
@@ -35,22 +35,30 @@ class BackupDatabaseToR2Command extends Command
         $db = config('database.connections.pgsql.database');
         $user = config('database.connections.pgsql.username');
         $pass = config('database.connections.pgsql.password');
+        $encryptionKey = env('BACKUP_ENCRYPTION_KEY', config('app.key'));
 
         putenv("PGPASSWORD={$pass}");
+        putenv("BACKUP_ENC_PASS={$encryptionKey}");
 
-        $cmd = "pg_dump -h {$host} -p {$port} -U {$user} -d {$db} --no-owner --clean | gzip > " . escapeshellarg($tempPath);
+        // Volcado con pg_dump -> compresión gzip -9 -> cifrado asimétrico/simétrico OpenSSL AES-256-CBC con salt y PBKDF2
+        // Para restaurar: openssl enc -d -aes-256-cbc -pbkdf2 -in {archivo}.sql.gz.enc -out restore.sql.gz -pass pass:{llave}
+        $cmd = "pg_dump -h {$host} -p {$port} -U {$user} -d {$db} --no-owner --clean | gzip -9 | openssl enc -aes-256-cbc -salt -pbkdf2 -pass env:BACKUP_ENC_PASS -out " . escapeshellarg($tempPath);
 
         exec($cmd, $output, $returnCode);
 
+        // Limpiar contraseña de cifrado del entorno de ejecución inmediatamente
+        putenv("BACKUP_ENC_PASS");
+        putenv("PGPASSWORD");
+
         if ($returnCode !== 0 || !file_exists($tempPath) || filesize($tempPath) === 0) {
-            $this->error('✗ Error generando el volcado con pg_dump.');
-            Log::error("Fallo en BackupDatabaseToR2Command: pg_dump retornó código {$returnCode}");
+            $this->error('✗ Error generando el volcado cifrado con pg_dump y openssl.');
+            Log::error("Fallo en BackupDatabaseToR2Command: proceso retornó código {$returnCode}");
             return Command::FAILURE;
         }
 
         $sizeBytes = filesize($tempPath);
         $sizeMb = round($sizeBytes / 1024 / 1024, 2);
-        $this->info("✓ Volcado generado localmente: {$filename} ({$sizeMb} MB)");
+        $this->info("✓ Volcado generado y cifrado con AES-256: {$filename} ({$sizeMb} MB)");
 
         try {
             $r2Path = "backups/{$filename}";
