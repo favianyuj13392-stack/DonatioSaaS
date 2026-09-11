@@ -14,9 +14,7 @@ export const StepUpChallengeModal: React.FC<StepUpChallengeModalProps> = ({
   isOpen,
   stepUpJwt,
   stepUpUrl = import.meta.env.VITE_CARDINAL_STEPUP_URL ||
-    (import.meta.env.PROD
-      ? 'https://centinelapi.cardinalcommerce.com/V2/Cruise/StepUp'
-      : 'https://centinelapistag.cardinalcommerce.com/V2/Cruise/StepUp'),
+    'https://centinelapistag.cardinalcommerce.com/V2/Cruise/StepUp',
   onSuccess,
   onCancel,
 }) => {

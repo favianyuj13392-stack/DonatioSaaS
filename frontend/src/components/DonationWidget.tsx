@@ -158,7 +158,9 @@ export const DonationWidget: React.FC = () => {
 
   // 3DS2 State
   const [cardinalJwt, setCardinalJwt] = useState<string | null>(null);
+  const [cardinalCollectionUrl, setCardinalCollectionUrl] = useState<string | null>(null);
   const [stepUpJwt, setStepUpJwt] = useState<string | null>(null);
+  const [stepUpUrl, setStepUpUrl] = useState<string | null>(null);
   const [pendingAuthTxId, setPendingAuthTxId] = useState<string | null>(null);
   const [pendingRefNumber, setPendingRefNumber] = useState<string | null>(null);
 
@@ -335,6 +337,10 @@ export const DonationWidget: React.FC = () => {
         authentication_transaction_id: pendingAuthTxId,
       });
 
+      if (!valRes.success) {
+        throw new Error(valRes.message || 'La autenticación bancaria no pudo ser completada.');
+      }
+
       setStepUpJwt(null);
       await executeFinalCheckout(pendingRefNumber, valRes);
     } catch (err: any) {
@@ -380,6 +386,9 @@ export const DonationWidget: React.FC = () => {
         const refNo = setupRes.merchant_reference_number;
         const authInfo = setupRes.data;
         setPendingRefNumber(refNo);
+        if (authInfo?.deviceDataCollectionUrl) {
+          setCardinalCollectionUrl(authInfo.deviceDataCollectionUrl);
+        }
 
         if (authInfo?.accessToken) {
           setSubmittingStep('Perfilando dispositivo de pago (Cardinal Cruise)...');
@@ -439,7 +448,14 @@ export const DonationWidget: React.FC = () => {
         if (enrollRes.isChallengeRequired && enrollRes.stepUpJwt) {
           setStepUpJwt(enrollRes.stepUpJwt);
           setPendingAuthTxId(enrollRes.authenticationTransactionId || null);
+          if (enrollRes.stepUpUrl) {
+            setStepUpUrl(enrollRes.stepUpUrl);
+          }
           return;
+        }
+
+        if (!enrollRes.success) {
+          throw new Error(enrollRes.message || 'La tarjeta no superó la autenticación 3DS2 de tu banco.');
         }
 
         // Flujo Frictionless -> Captura directa
@@ -465,16 +481,23 @@ export const DonationWidget: React.FC = () => {
     <div id="donar" className="w-full max-w-6xl mx-auto my-8 px-4 sm:px-6">
       {/* Servicios invisibles de riesgo y perfilado */}
       <ThreatMetrixScript onSessionGenerated={(sid: string) => setFingerprintSessionId(sid)} />
-      {cardinalJwt && <CardinalDataCollector jwt={cardinalJwt} />}
+      {cardinalJwt && (
+        <CardinalDataCollector
+          jwt={cardinalJwt}
+          collectionUrl={cardinalCollectionUrl || undefined}
+        />
+      )}
 
       {/* Modal de Desafío OTP 3DS2 */}
       {stepUpJwt && (
         <StepUpChallengeModal
           isOpen={true}
           stepUpJwt={stepUpJwt}
+          stepUpUrl={stepUpUrl || undefined}
           onSuccess={handleChallengeSuccess}
           onCancel={() => {
             setStepUpJwt(null);
+            setStepUpUrl(null);
             setIsSubmitting(false);
             setErrorMessage('La verificación de seguridad 3DS fue cancelada.');
           }}
