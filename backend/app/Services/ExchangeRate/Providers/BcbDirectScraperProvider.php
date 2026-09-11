@@ -40,28 +40,55 @@ class BcbDirectScraperProvider implements ExchangeRateProviderInterface
 
             $html = $response->body();
 
-            // Buscar patrones típicos del tipo de cambio oficial en el portal del BCB (ej: Compra 11.83 / Venta 11.93 o 6.86 / 6.96)
-            $buyMatch = [];
-            $sellMatch = [];
+            $buyRate = null;
+            $sellRate = null;
+            $effectiveDate = null;
 
-            if (preg_match('/(?:compra|compra\s*:)\s*<\/?[^>]*>\s*([0-9]{1,2}[.,][0-9]{2,4})/i', $html, $buyMatch)) {
-                $buyRate = (float) str_replace(',', '.', $buyMatch[1]);
+            // 1. Intentar extraer mediante la estructura moderna del portal BCB (.bcb-tco-num y datetime)
+            $rateMatch = [];
+            $dateMatch = [];
+
+            if (preg_match('/class=["\'](?:[^"\']*\s)?bcb-tco-num(?:\s[^"\']*)?["\']>([0-9]{1,2}[.,][0-9]{2,4})</i', $html, $rateMatch)) {
+                $baseRate = (float) str_replace(',', '.', $rateMatch[1]);
+                $buyRate = $baseRate;
+                // En el régimen flexible oficial del BCB (RD 88/2026), la cotización base es compra y la venta referencial es compra + 0.10
+                $sellRate = round($baseRate + 0.10, 4);
+
+                if (preg_match('/<time[^>]*datetime=["\']([0-9]{4}-[0-9]{2}-[0-9]{2})["\']/i', $html, $dateMatch)) {
+                    $effectiveDate = $dateMatch[1];
+                }
             } else {
-                return null;
+                // 2. Fallback a patrones heredados del portal (Compra / Venta explícitos, con o sin etiquetas HTML intermedias)
+                $buyMatch = [];
+                $sellMatch = [];
+
+                if (preg_match('/(?:compra|compra\s*:)(?:[^0-9]{0,60})([0-9]{1,2}[.,][0-9]{2,4})/i', $html, $buyMatch)) {
+                    $buyRate = (float) str_replace(',', '.', $buyMatch[1]);
+                }
+
+                if (preg_match('/(?:venta|venta\s*:)(?:[^0-9]{0,60})([0-9]{1,2}[.,][0-9]{2,4})/i', $html, $sellMatch)) {
+                    $sellRate = (float) str_replace(',', '.', $sellMatch[1]);
+                } elseif ($buyRate !== null) {
+                    $sellRate = round($buyRate + 0.10, 4);
+                }
             }
 
-            if (preg_match('/(?:venta|venta\s*:)\s*<\/?[^>]*>\s*([0-9]{1,2}[.,][0-9]{2,4})/i', $html, $sellMatch)) {
-                $sellRate = (float) str_replace(',', '.', $sellMatch[1]);
-            } else {
-                $sellRate = round($buyRate + 0.10, 4);
+            if ($buyRate === null || $sellRate === null) {
+                Log::warning('BcbDirectScraperProvider could not parse exchange rate from HTML');
+                return null;
             }
 
             return new ExchangeRateDto(
                 buyRate: $buyRate,
                 sellRate: $sellRate,
-                effectiveDate: now()->toDateString(),
+                effectiveDate: $effectiveDate ?? now()->toDateString(),
                 source: $this->getProviderName(),
-                rawPayload: ['scraped_url' => $this->url, 'buy' => $buyRate, 'sell' => $sellRate],
+                rawPayload: [
+                    'scraped_url'    => $this->url,
+                    'buy'            => $buyRate,
+                    'sell'           => $sellRate,
+                    'effective_date' => $effectiveDate,
+                ],
                 currencyPair: 'USD/BOB',
             );
         } catch (\Throwable $e) {

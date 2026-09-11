@@ -24,9 +24,9 @@ class ExchangeRateService
     public function __construct(array $providers = [])
     {
         $this->providers = !empty($providers) ? $providers : [
+            new BcbDirectScraperProvider(),
             new CucuBcbProvider(),
             new DolarApiBcbProvider(),
-            new BcbDirectScraperProvider(),
         ];
     }
 

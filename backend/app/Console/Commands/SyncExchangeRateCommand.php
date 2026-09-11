@@ -39,9 +39,9 @@ class SyncExchangeRateCommand extends Command
             $this->warn('🔍 Diagnosticando las 3 fuentes oficiales en vivo:');
             
             $providers = [
-                'Primario (CUCU API)'        => new CucuBcbProvider(),
-                'Secundario (DolarApi)'      => new DolarApiBcbProvider(),
-                'Terciario (BCB Scraper)'    => new BcbDirectScraperProvider(),
+                'Primario (BCB Direct Scraper)' => new BcbDirectScraperProvider(),
+                'Secundario (CUCU API)'         => new CucuBcbProvider(),
+                'Terciario (DolarApi)'          => new DolarApiBcbProvider(),
             ];
 
             $rows = [];
