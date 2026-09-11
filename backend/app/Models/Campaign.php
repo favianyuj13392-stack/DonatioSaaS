@@ -29,6 +29,7 @@ class Campaign extends Model
         'thank_you_message',
         'allowed_frequencies',
         'allowed_payment_methods',
+        'allowed_currencies',
         'monthly_label',
         'single_label',
         'start_date',
@@ -67,5 +68,55 @@ class Campaign extends Model
         }
 
         return min(100.0, round(($this->current_amount / $this->monetary_goal) * 100, 2));
+    }
+
+    /**
+     * Accessor para asegurar que donation_tiers siempre devuelva una estructura segregada ['bob' => [...], 'usd' => [...]].
+     */
+    public function getDonationTiersAttribute($value): array
+    {
+        $defaultTiers = [
+            'bob' => [
+                ['amount' => 50, 'label' => 'Aporte de apoyo continuo', 'is_default' => false],
+                ['amount' => 100, 'label' => 'Aporte de alto impacto', 'is_default' => true],
+                ['amount' => 200, 'label' => 'Aporte padrino solidario', 'is_default' => false],
+            ],
+            'usd' => [
+                ['amount' => 10, 'label' => 'Aporte internacional inicial', 'is_default' => false],
+                ['amount' => 25, 'label' => 'Aporte de alto impacto global', 'is_default' => true],
+                ['amount' => 50, 'label' => 'Aporte protector de la causa', 'is_default' => false],
+                ['amount' => 100, 'label' => 'Aporte padrino internacional', 'is_default' => false],
+            ],
+        ];
+
+        if (empty($value)) {
+            return $defaultTiers;
+        }
+
+        $decoded = is_string($value) ? json_decode($value, true) : $value;
+        if (!is_array($decoded)) {
+            return $defaultTiers;
+        }
+
+        if (isset($decoded['bob']) || isset($decoded['usd'])) {
+            return [
+                'bob' => !empty($decoded['bob']) ? $decoded['bob'] : $defaultTiers['bob'],
+                'usd' => !empty($decoded['usd']) ? $decoded['usd'] : $defaultTiers['usd'],
+            ];
+        }
+
+        // Compatibilidad con formato plano heredado en BOB
+        return [
+            'bob' => $decoded,
+            'usd' => $defaultTiers['usd'],
+        ];
+    }
+
+    /**
+     * Retorna los tiers organizados por moneda ('bob' y 'usd').
+     */
+    public function getStructuredTiers(): array
+    {
+        return $this->donation_tiers;
     }
 }

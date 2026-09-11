@@ -78,6 +78,7 @@ class DonationCheckoutController extends Controller
                 'progress_percentage'     => $campaign->progress_percentage,
                 'allowed_frequencies'     => $campaign->allowed_frequencies,
                 'allowed_payment_methods' => $campaign->allowed_payment_methods,
+                'allowed_currencies'      => $campaign->allowed_currencies ?? 'all',
                 'donation_tiers'          => $campaign->donation_tiers ?? [],
                 'tangible_impact_items'   => $campaign->tangible_impact_items ?? [],
                 'funds_breakdown'         => $campaign->funds_breakdown ?? null,
@@ -309,6 +310,29 @@ class DonationCheckoutController extends Controller
                 ]);
             }
 
+            // Validación estricta de restricciones contextuales de la campaña
+            if (!empty($validated['campaign_id'])) {
+                $campaign = Campaign::where('foundation_id', $tenant->id)->find($validated['campaign_id']);
+                if ($campaign) {
+                    if ($campaign->allowed_frequencies === 'monthly_only' && $validated['frequency'] !== 'monthly') {
+                        return response()->json(['error' => 'Esta campaña solo admite donaciones mensuales recurrentes.'], 422);
+                    }
+                    if ($campaign->allowed_frequencies === 'single_only' && $validated['frequency'] !== 'single') {
+                        return response()->json(['error' => 'Esta campaña solo admite donaciones únicas.'], 422);
+                    }
+                    $currency = strtoupper($validated['currency'] ?? 'BOB');
+                    if ($campaign->allowed_currencies === 'bob_only' && $currency === 'USD') {
+                        return response()->json(['error' => 'Esta campaña solo admite donaciones en Bolivianos (BOB).'], 422);
+                    }
+                    if ($campaign->allowed_currencies === 'usd_only' && $currency === 'BOB') {
+                        return response()->json(['error' => 'Esta campaña solo admite donaciones en Dólares (USD).'], 422);
+                    }
+                    if ($campaign->allowed_payment_methods === 'qr_only') {
+                        return response()->json(['error' => 'Esta campaña solo admite pagos vía QR.'], 422);
+                    }
+                }
+            }
+
             $isAnonymous = $validated['is_anonymous'] ?? false;
             $donor = null;
 
@@ -331,8 +355,10 @@ class DonationCheckoutController extends Controller
 
                     $rawResponse = $paymentResult['raw_gateway_response'] ?? [];
                     $tokenInfo = $rawResponse['tokenInformation'] ?? [];
-                    $paymentInstrumentId = $tokenInfo['instrumentIdentifier']['id'] ?? ($tokenInfo['paymentInstrument']['id'] ?? null);
-                    $customerId = $tokenInfo['customer']['id'] ?? null;
+                    $paymentInstrumentId = $paymentResult['tms_payment_instrument_id']
+                        ?? ($tokenInfo['instrumentIdentifier']['id'] ?? ($tokenInfo['paymentInstrument']['id'] ?? null));
+                    $customerId = $paymentResult['tms_customer_id']
+                        ?? ($tokenInfo['customer']['id'] ?? null);
                     $cardLastFour = substr($validated['card_number'] ?? '0000', -4);
                     $cardBrand = strtoupper($validated['card_type'] ?? 'VISA');
 

@@ -114,29 +114,59 @@ class CampaignResource extends Resource
                         Forms\Components\Tabs\Tab::make('Tiers & Destino Tangible')
                             ->icon('heroicon-o-gift')
                             ->schema([
-                                Forms\Components\Section::make('Botones de Aporte Rápido con Anclaje de Impacto (Impact Anchoring)')
-                                    ->description('Define los montos sugeridos y la descripción tangible de lo que hace posible cada aporte.')
+                                Forms\Components\Section::make('Botones de Aporte Rápido con Anclaje de Impacto (Multi-Moneda)')
+                                    ->description('Define los montos sugeridos y la descripción tangible de lo que hace posible cada aporte en Bolivianos (BOB) y Dólares (USD).')
                                     ->schema([
-                                        Forms\Components\Repeater::make('donation_tiers')
-                                            ->label('Tiers de Donación')
-                                            ->schema([
-                                                Forms\Components\TextInput::make('amount')
-                                                    ->label('Monto (Bs.)')
-                                                    ->numeric()
-                                                    ->prefix('Bs.')
-                                                    ->required(),
-                                                Forms\Components\TextInput::make('label')
-                                                    ->label('Impacto Tangible')
-                                                    ->placeholder('ej. 1 Kit de medicinas básicas para quimio')
-                                                    ->required()
-                                                    ->columnSpan(2),
-                                                Forms\Components\Toggle::make('is_default')
-                                                    ->label('Preseleccionado')
-                                                    ->default(false),
-                                            ])
-                                            ->columns(4)
-                                            ->defaultItems(4)
-                                            ->collapsible(),
+                                        Forms\Components\Tabs::make('TiersMultiMoneda')
+                                            ->tabs([
+                                                Forms\Components\Tabs\Tab::make('🇧🇴 Bolivianos (BOB)')
+                                                    ->schema([
+                                                        Forms\Components\Repeater::make('donation_tiers.bob')
+                                                            ->label('Tiers Sugeridos en Bolivianos')
+                                                            ->schema([
+                                                                Forms\Components\TextInput::make('amount')
+                                                                    ->label('Monto (Bs.)')
+                                                                    ->numeric()
+                                                                    ->prefix('Bs.')
+                                                                    ->required(),
+                                                                Forms\Components\TextInput::make('label')
+                                                                    ->label('Impacto Tangible')
+                                                                    ->placeholder('ej. 1 Kit de medicinas básicas para quimio')
+                                                                    ->required()
+                                                                    ->columnSpan(2),
+                                                                Forms\Components\Toggle::make('is_default')
+                                                                    ->label('Preseleccionado')
+                                                                    ->default(false),
+                                                            ])
+                                                            ->columns(4)
+                                                            ->defaultItems(3)
+                                                            ->collapsible(),
+                                                    ]),
+
+                                                Forms\Components\Tabs\Tab::make('🇺🇸 Dólares (USD)')
+                                                    ->schema([
+                                                        Forms\Components\Repeater::make('donation_tiers.usd')
+                                                            ->label('Tiers Sugeridos en Dólares')
+                                                            ->schema([
+                                                                Forms\Components\TextInput::make('amount')
+                                                                    ->label('Monto ($ USD)')
+                                                                    ->numeric()
+                                                                    ->prefix('$')
+                                                                    ->required(),
+                                                                Forms\Components\TextInput::make('label')
+                                                                    ->label('Impacto Tangible')
+                                                                    ->placeholder('ej. 1 International cancer care support kit')
+                                                                    ->required()
+                                                                    ->columnSpan(2),
+                                                                Forms\Components\Toggle::make('is_default')
+                                                                    ->label('Preseleccionado')
+                                                                    ->default(false),
+                                                            ])
+                                                            ->columns(4)
+                                                            ->defaultItems(3)
+                                                            ->collapsible(),
+                                                    ]),
+                                            ])->columnSpanFull(),
                                     ]),
 
                                 Forms\Components\Section::make('Micro-Historias & Destino Tangible de Fondos')
@@ -238,9 +268,9 @@ class CampaignResource extends Resource
                                 Forms\Components\Select::make('allowed_frequencies')
                                     ->label('Frecuencias Permitidas')
                                     ->options([
-                                        'all'          => 'Todas (Aporte Único y Suscripción Mensual)',
-                                        'monthly_only' => 'Solo Donación Mensual (Socios)',
-                                        'single_only'  => 'Solo Aporte Único',
+                                        'all'          => 'Todas (Única y Mensual)',
+                                        'monthly_only' => 'Solo Donación Mensual (Socios Recurrentes)',
+                                        'single_only'  => 'Solo Donación Única (Express / Eventos)',
                                     ])
                                     ->default('all')
                                     ->required()
@@ -253,19 +283,67 @@ class CampaignResource extends Resource
 
                                 Forms\Components\Select::make('allowed_payment_methods')
                                     ->label('Métodos de Pago Permitidos')
-                                    ->options([
-                                        'all'       => 'Todos (Tarjeta 3DS2 y QR ATC)',
-                                        'card_only' => 'Solo Tarjeta de Crédito/Débito',
-                                        'qr_only'   => 'Solo QR Simple ATC',
-                                    ])
+                                    ->options(function (Get $get) {
+                                        $freq = $get('allowed_frequencies');
+                                        $curr = $get('allowed_currencies');
+                                        if ($freq === 'monthly_only' || $curr === 'usd_only') {
+                                            return [
+                                                'card_only' => 'Solo Tarjeta de Crédito/Débito (ATC)',
+                                            ];
+                                        }
+                                        return [
+                                            'all'       => 'Todos (Tarjeta y QR)',
+                                            'card_only' => 'Solo Tarjeta de Crédito/Débito (ATC)',
+                                            'qr_only'   => 'Solo Código QR Simple',
+                                        ];
+                                    })
                                     ->default('all')
                                     ->required()
-                                    ->disabled(fn (Get $get) => $get('allowed_frequencies') === 'monthly_only')
-                                    ->helperText(fn (Get $get) => 
-                                        $get('allowed_frequencies') === 'monthly_only' 
-                                            ? 'Las donaciones mensuales requieren tarjeta tokenizada TMS (QR deshabilitado automáticamente).'
-                                            : 'Selecciona los métodos disponibles en el checkout.'
-                                    ),
+                                    ->live()
+                                    ->afterStateUpdated(function ($state, Set $set) {
+                                        if ($state === 'qr_only') {
+                                            $set('allowed_currencies', 'bob_only');
+                                        }
+                                    })
+                                    ->helperText(function (Get $get) {
+                                        if ($get('allowed_frequencies') === 'monthly_only') {
+                                            return 'Las donaciones mensuales requieren tarjeta (débito automático recurrente).';
+                                        }
+                                        if ($get('allowed_currencies') === 'usd_only') {
+                                            return 'Las donaciones en USD requieren tarjeta de crédito/débito.';
+                                        }
+                                        return 'Selecciona los métodos disponibles en el checkout.';
+                                    }),
+
+                                Forms\Components\Select::make('allowed_currencies')
+                                    ->label('Monedas Permitidas')
+                                    ->options(function (Get $get) {
+                                        $payment = $get('allowed_payment_methods');
+                                        if ($payment === 'qr_only') {
+                                            return [
+                                                'bob_only' => 'Solo Bolivianos (Bs) - Exclusivo para QR',
+                                            ];
+                                        }
+                                        return [
+                                            'all'      => 'Todas (Bolivianos Bs y Dólares USD)',
+                                            'bob_only' => 'Solo Bolivianos (Bs)',
+                                            'usd_only' => 'Solo Dólares (USD)',
+                                        ];
+                                    })
+                                    ->default('all')
+                                    ->required()
+                                    ->live()
+                                    ->afterStateUpdated(function ($state, Set $set) {
+                                        if ($state === 'usd_only') {
+                                            $set('allowed_payment_methods', 'card_only');
+                                        }
+                                    })
+                                    ->helperText(function (Get $get) {
+                                        if ($get('allowed_payment_methods') === 'qr_only') {
+                                            return 'El sistema QR bancario opera únicamente en moneda nacional (Bs).';
+                                        }
+                                        return 'Define las monedas admitidas en el checkout para esta campaña.';
+                                    }),
 
                                 Forms\Components\DatePicker::make('start_date')
                                     ->label('Fecha de Inicio'),
@@ -340,6 +418,16 @@ class CampaignResource extends Resource
                         'paused'    => 'Pausada',
                         'completed' => 'Finalizada',
                         default     => $state,
+                    }),
+
+                Tables\Columns\TextColumn::make('allowed_currencies')
+                    ->label('Monedas')
+                    ->badge()
+                    ->color('gray')
+                    ->formatStateUsing(fn (?string $state): string => match ($state) {
+                        'bob_only' => '🇧🇴 Solo Bs',
+                        'usd_only' => '🇺🇸 Solo USD',
+                        default    => '🌎 Todas',
                     }),
             ])
             ->filters([

@@ -73,6 +73,12 @@ export interface DonationTier {
   amount: number;
   label: string;
   is_default?: boolean;
+  currency?: 'BOB' | 'USD';
+}
+
+export interface MultiCurrencyTiers {
+  bob: DonationTier[];
+  usd: DonationTier[];
 }
 
 export interface TangibleImpactItem {
@@ -96,7 +102,8 @@ export interface Campaign {
   progress_percentage: number;
   allowed_frequencies?: 'all' | 'monthly_only' | 'single_only';
   allowed_payment_methods?: 'all' | 'card_only' | 'qr_only';
-  donation_tiers?: DonationTier[];
+  allowed_currencies?: 'all' | 'bob_only' | 'usd_only';
+  donation_tiers?: MultiCurrencyTiers | DonationTier[];
   tangible_impact_items?: TangibleImpactItem[];
   funds_breakdown?: FundsBreakdownItem[] | null;
   testimonial?: TestimonialItem | null;

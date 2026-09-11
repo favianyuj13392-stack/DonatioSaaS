@@ -30,15 +30,39 @@ import {
 export const DonationWidget: React.FC = () => {
   const { tenant, campaign, subdomain, refreshData } = useTenant();
 
-  const defaultFoundationTiers: DonationTier[] = [
+  const defaultBobTiers: DonationTier[] = [
     { amount: 50, label: 'Aporte de apoyo continuo', is_default: false },
     { amount: 100, label: 'Aporte de alto impacto', is_default: true },
     { amount: 200, label: 'Aporte padrino solidario', is_default: false },
   ];
 
-  const tiers: DonationTier[] = campaign?.donation_tiers && campaign.donation_tiers.length > 0
-    ? campaign.donation_tiers
-    : defaultFoundationTiers;
+  const defaultUsdTiers: DonationTier[] = [
+    { amount: 10, label: 'Aporte internacional inicial', is_default: false },
+    { amount: 25, label: 'Aporte de alto impacto global', is_default: true },
+    { amount: 50, label: 'Aporte protector de la causa', is_default: false },
+    { amount: 100, label: 'Aporte padrino internacional', is_default: false },
+  ];
+
+  // Extraer tiers segregados según la estructura (objeto { bob, usd } o array plano retrocompatible)
+  const tiersByCurrency = React.useMemo(() => {
+    const rawTiers: any = campaign?.donation_tiers;
+    if (rawTiers && !Array.isArray(rawTiers) && (rawTiers.bob || rawTiers.usd)) {
+      return {
+        Bs: Array.isArray(rawTiers.bob) && rawTiers.bob.length > 0 ? rawTiers.bob : defaultBobTiers,
+        USD: Array.isArray(rawTiers.usd) && rawTiers.usd.length > 0 ? rawTiers.usd : defaultUsdTiers,
+      };
+    }
+    if (Array.isArray(rawTiers) && rawTiers.length > 0) {
+      return {
+        Bs: rawTiers,
+        USD: defaultUsdTiers,
+      };
+    }
+    return {
+      Bs: defaultBobTiers,
+      USD: defaultUsdTiers,
+    };
+  }, [campaign?.donation_tiers]);
 
   // Frecuencia: monthly | single
   const initialFrequency = campaign?.allowed_frequencies === 'monthly_only' ? 'monthly' : 'monthly';
@@ -47,12 +71,69 @@ export const DonationWidget: React.FC = () => {
   // Método de pago: card | qr
   const [paymentMethod, setPaymentMethod] = useState<'card' | 'qr'>('card');
 
-  // Montos y Moneda
-  const defaultTier = tiers.find(t => t.is_default) || tiers[1] || tiers[0];
-  const [amount, setAmount] = useState<number>(defaultTier?.amount || 100);
+  // Estado para recordar la preferencia de divisa del usuario al operar en tarjeta
+  const initialCurrency = campaign?.allowed_currencies === 'usd_only' ? 'USD' : 'Bs';
+  const [cardCurrency, setCardCurrency] = useState<'Bs' | 'USD'>(initialCurrency);
+  const [currency, setCurrency] = useState<'Bs' | 'USD'>(initialCurrency);
+
+  // Tiers activos según la divisa seleccionada
+  const activeTiers: DonationTier[] = tiersByCurrency[currency] || defaultBobTiers;
+
+  // Montos y Selección
+  const defaultTier = activeTiers.find(t => t.is_default) || activeTiers[1] || activeTiers[0];
+  const [amount, setAmount] = useState<number>(defaultTier?.amount || (initialCurrency === 'USD' ? 25 : 100));
   const [customAmount, setCustomAmount] = useState<string>('');
   const [isCustom, setIsCustom] = useState<boolean>(false);
-  const [currency, setCurrency] = useState<'Bs' | 'USD'>('Bs');
+
+  // Máquina de estados: Sincronización contextual estricta
+  useEffect(() => {
+    if (paymentMethod === 'qr') {
+      setFrequency('single');
+      setCurrency('Bs');
+    } else if (paymentMethod === 'card') {
+      if (campaign?.allowed_currencies === 'usd_only') {
+        setCurrency('USD');
+      } else if (campaign?.allowed_currencies === 'bob_only') {
+        setCurrency('Bs');
+      } else {
+        setCurrency(cardCurrency);
+      }
+    }
+  }, [paymentMethod, campaign?.allowed_currencies, cardCurrency]);
+
+  // Sincronizar restricciones de frecuencia impuestas por la campaña
+  useEffect(() => {
+    if (campaign?.allowed_frequencies === 'monthly_only') {
+      setFrequency('monthly');
+      setPaymentMethod('card');
+    } else if (campaign?.allowed_frequencies === 'single_only' || (campaign?.allowed_frequencies as string) === 'once_only') {
+      setFrequency('single');
+    }
+  }, [campaign?.allowed_frequencies]);
+
+  // Sincronizar restricciones de métodos de pago y divisas impuestas por la campaña
+  useEffect(() => {
+    if (campaign?.allowed_payment_methods === 'card_only' || campaign?.allowed_currencies === 'usd_only') {
+      setPaymentMethod('card');
+    }
+  }, [campaign?.allowed_payment_methods, campaign?.allowed_currencies]);
+
+  // Ajustar monto por defecto si cambia la divisa y no hay monto personalizado ingresado
+  const handleToggleCurrency = () => {
+    if (campaign?.allowed_currencies === 'usd_only' || campaign?.allowed_currencies === 'bob_only' || paymentMethod === 'qr') {
+      return;
+    }
+    const nextCurrency = currency === 'Bs' ? 'USD' : 'Bs';
+    setCurrency(nextCurrency);
+    setCardCurrency(nextCurrency);
+    setIsCustom(false);
+    setCustomAmount('');
+    const nextTiers = tiersByCurrency[nextCurrency];
+    const defaultNext = nextTiers.find((t: DonationTier) => t.is_default) || nextTiers[0];
+    if (defaultNext) {
+      setAmount(defaultNext.amount);
+    }
+  };
 
   // Datos de tarjeta con AVS nacional/internacional
   const [cardData, setCardData] = useState<CardFormData>({
@@ -104,22 +185,34 @@ export const DonationWidget: React.FC = () => {
     setIsLegalModalOpen(true);
   };
 
-  // Sincronizar frecuencia si la campaña impone restricciones
-  useEffect(() => {
-    if (campaign?.allowed_frequencies === 'monthly_only') {
-      setFrequency('monthly');
-      setPaymentMethod('card');
-    } else if (campaign?.allowed_frequencies === 'single_only') {
-      setFrequency('single');
-    }
-  }, [campaign?.allowed_frequencies]);
+  // Restricciones bancarias y contextuales de la campaña
+  const isQrDisabled = Boolean(
+    frequency === 'monthly' ||
+    campaign?.allowed_payment_methods === 'card_only' ||
+    campaign?.allowed_currencies === 'usd_only'
+  );
 
-  // Si selecciona QR, forzar a donación única
-  useEffect(() => {
-    if (paymentMethod === 'qr') {
-      setFrequency('single');
-    }
-  }, [paymentMethod]);
+  const qrDisabledReason = frequency === 'monthly'
+    ? 'El pago con QR no admite suscripciones mensuales recurrentes.'
+    : campaign?.allowed_currencies === 'usd_only'
+    ? 'El QR bancario no opera en Dólares (USD).'
+    : campaign?.allowed_payment_methods === 'card_only'
+    ? 'Esta campaña solo admite pagos con tarjeta de crédito/débito.'
+    : undefined;
+
+  const isMonthlyDisabled = Boolean(
+    paymentMethod === 'qr' ||
+    campaign?.allowed_frequencies === 'single_only' ||
+    (campaign?.allowed_frequencies as string) === 'once_only'
+  );
+
+  const monthlyDisabledReason = paymentMethod === 'qr'
+    ? 'El pago con QR no admite débitos mensuales recurrentes.'
+    : 'Esta campaña está configurada solo para aportes únicos.';
+
+  const isSingleDisabled = Boolean(
+    campaign?.allowed_frequencies === 'monthly_only'
+  );
 
   const currentAmount = isCustom ? parseFloat(customAmount) || 0 : amount;
 
@@ -444,11 +537,11 @@ export const DonationWidget: React.FC = () => {
           <div>
             <label className="block text-xs sm:text-sm font-bold text-gray-800 mb-2">Monto de la donación</label>
             
-            {/* Montos Predefinidos Flexibles y Auto-adaptables (2, 3, 4, 5, 6 montos) */}
+            {/* Montos Predefinidos Flexibles Multi-Moneda (Auto-adaptables al cambiar entre Bs y USD) */}
             <div className="flex flex-wrap gap-2">
-              {tiers.map((t) => (
+              {activeTiers.map((t) => (
                 <button
-                  key={t.amount}
+                  key={`${currency}-${t.amount}`}
                   type="button"
                   onClick={() => handleSelectTier(t.amount)}
                   className={`flex-1 min-w-[70px] sm:min-w-[80px] py-2.5 px-3 rounded-2xl text-center border-2 transition-all font-bold text-xs sm:text-sm whitespace-nowrap ${
@@ -483,12 +576,27 @@ export const DonationWidget: React.FC = () => {
               <div className="absolute right-1.5 flex items-center">
                 <button
                   type="button"
-                  onClick={() => setCurrency(currency === 'Bs' ? 'USD' : 'Bs')}
-                  title="Cambiar divisa"
-                  className="px-2.5 py-1 text-xs font-black text-gray-700 bg-white hover:bg-gray-100 border border-gray-200 rounded-xl shadow-2xs transition flex items-center gap-1"
+                  onClick={handleToggleCurrency}
+                  disabled={campaign?.allowed_currencies === 'usd_only' || campaign?.allowed_currencies === 'bob_only' || paymentMethod === 'qr'}
+                  title={
+                    paymentMethod === 'qr'
+                      ? 'El pago con QR solo opera en Bolivianos'
+                      : campaign?.allowed_currencies === 'usd_only'
+                      ? 'Esta campaña solo opera en Dólares (USD)'
+                      : campaign?.allowed_currencies === 'bob_only'
+                      ? 'Esta campaña solo opera en Bolivianos (Bs)'
+                      : 'Alternar divisa (Bs / USD)'
+                  }
+                  className={`px-2.5 py-1 text-xs font-black rounded-xl shadow-2xs transition flex items-center gap-1 ${
+                    campaign?.allowed_currencies === 'usd_only' || campaign?.allowed_currencies === 'bob_only' || paymentMethod === 'qr'
+                      ? 'bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed'
+                      : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
+                  }`}
                 >
                   <span>{currency}</span>
-                  <span className="text-[10px] text-gray-400">▾</span>
+                  {campaign?.allowed_currencies !== 'usd_only' && campaign?.allowed_currencies !== 'bob_only' && paymentMethod !== 'qr' && (
+                    <span className="text-[10px] text-gray-400">▾</span>
+                  )}
                 </button>
               </div>
             </div>
@@ -513,9 +621,17 @@ export const DonationWidget: React.FC = () => {
 
               <button
                 type="button"
-                onClick={() => setPaymentMethod('qr')}
+                onClick={() => {
+                  if (!isQrDisabled) {
+                    setPaymentMethod('qr');
+                  }
+                }}
+                disabled={isQrDisabled}
+                title={qrDisabledReason}
                 className={`py-2 px-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-1.5 ${
-                  paymentMethod === 'qr'
+                  isQrDisabled
+                    ? 'opacity-40 cursor-not-allowed text-gray-400'
+                    : paymentMethod === 'qr'
                     ? 'bg-white text-gray-900 shadow-sm border border-gray-200/50'
                     : 'text-gray-500 hover:text-gray-800'
                 }`}
@@ -532,10 +648,15 @@ export const DonationWidget: React.FC = () => {
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
-                onClick={() => setFrequency('monthly')}
-                disabled={paymentMethod === 'qr'}
+                onClick={() => {
+                  if (!isMonthlyDisabled) {
+                    setFrequency('monthly');
+                  }
+                }}
+                disabled={isMonthlyDisabled}
+                title={isMonthlyDisabled ? monthlyDisabledReason : undefined}
                 className={`p-3 rounded-2xl border-2 text-left transition-all relative ${
-                  paymentMethod === 'qr'
+                  isMonthlyDisabled
                     ? 'opacity-40 cursor-not-allowed border-gray-200 bg-gray-50'
                     : frequency === 'monthly'
                     ? 'border-[var(--tenant-primary)] bg-[var(--tenant-primary-soft)] text-gray-900 shadow-sm'
@@ -547,7 +668,7 @@ export const DonationWidget: React.FC = () => {
                     <RefreshCw className="w-3.5 h-3.5 text-emerald-600" />
                     Mensual
                   </span>
-                  {frequency === 'monthly' && paymentMethod !== 'qr' && (
+                  {frequency === 'monthly' && !isMonthlyDisabled && (
                     <span className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[10px] font-black">
                       ✓
                     </span>
@@ -560,9 +681,17 @@ export const DonationWidget: React.FC = () => {
 
               <button
                 type="button"
-                onClick={() => setFrequency('single')}
+                onClick={() => {
+                  if (!isSingleDisabled) {
+                    setFrequency('single');
+                  }
+                }}
+                disabled={isSingleDisabled}
+                title={isSingleDisabled ? 'Esta campaña es exclusiva para socios mensuales.' : undefined}
                 className={`p-3 rounded-2xl border-2 text-left transition-all ${
-                  frequency === 'single'
+                  isSingleDisabled
+                    ? 'opacity-40 cursor-not-allowed border-gray-200 bg-gray-50'
+                    : frequency === 'single'
                     ? 'border-[var(--tenant-primary)] bg-[var(--tenant-primary-soft)] text-gray-900 shadow-sm'
                     : 'border-gray-200 hover:border-gray-300 bg-white'
                 }`}

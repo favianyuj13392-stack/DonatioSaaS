@@ -36,8 +36,10 @@ class PublicCampaignController extends Controller
                     'banner_url'          => $c->banner_url ?: null,
                     'monetary_goal'       => (float) $c->monetary_goal,
                     'current_amount'      => (float) $c->current_amount,
-                    'progress_percentage' => $c->progress_percentage,
-                    'allowed_frequencies' => $c->allowed_frequencies,
+                    'progress_percentage'     => $c->progress_percentage,
+                    'allowed_frequencies'     => $c->allowed_frequencies,
+                    'allowed_payment_methods' => $c->allowed_payment_methods,
+                    'allowed_currencies'      => $c->allowed_currencies ?? 'all',
                 ]);
 
             return [
@@ -118,12 +120,14 @@ class PublicCampaignController extends Controller
                     ];
                 }
                 if ($campaign->allowed_payment_methods === 'all' || $campaign->allowed_payment_methods === 'qr_only') {
-                    $paymentProviders[] = [
-                        'id'        => 'qr',
-                        'name'      => 'QR Simple Bancario',
-                        'processor' => 'ATC Red Enlace',
-                        'is_active' => true,
-                    ];
+                    if ($campaign->allowed_currencies !== 'usd_only') {
+                        $paymentProviders[] = [
+                            'id'        => 'qr',
+                            'name'      => 'QR Simple Bancario',
+                            'processor' => 'ATC Red Enlace',
+                            'is_active' => true,
+                        ];
+                    }
                 }
             }
 
@@ -166,7 +170,8 @@ class PublicCampaignController extends Controller
                     'progress_percentage'     => $campaign->progress_percentage,
                     'allowed_frequencies'     => $campaign->allowed_frequencies,
                     'allowed_payment_methods' => $campaign->allowed_payment_methods,
-                    'donation_tiers'          => !empty($campaign->donation_tiers) ? $campaign->donation_tiers : [],
+                    'allowed_currencies'      => $campaign->allowed_currencies ?? 'all',
+                    'donation_tiers'          => $campaign->donation_tiers,
                     'tangible_impact_items'   => !empty($campaign->tangible_impact_items) ? $campaign->tangible_impact_items : [],
                     'funds_breakdown'         => !empty($campaign->funds_breakdown) ? $campaign->funds_breakdown : null,
                     'testimonial'             => !empty($campaign->testimonial) ? $campaign->testimonial : null,

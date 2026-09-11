@@ -1,11 +1,11 @@
 import React from 'react';
 import { Utensils, Pill, Home, Heart, BookOpen, Trees, Droplet, Shield, ArrowUpRight } from 'lucide-react';
-import { TangibleImpactItem, DonationTier } from '../types';
+import { TangibleImpactItem, DonationTier, MultiCurrencyTiers } from '../types';
 import { useScrollAnimation } from '../hooks/useScrollAnimation';
 
 interface ImpactGridSectionProps {
   impactItems?: TangibleImpactItem[];
-  tiers?: DonationTier[];
+  tiers?: MultiCurrencyTiers | DonationTier[];
 }
 
 function getImpactIcon(iconName: string) {
@@ -27,17 +27,21 @@ function getImpactIcon(iconName: string) {
 export const ImpactGridSection: React.FC<ImpactGridSectionProps> = ({ impactItems, tiers }) => {
   const { ref, isVisible } = useScrollAnimation({ threshold: 0.05 });
 
-  if ((!impactItems || impactItems.length === 0) && (!tiers || tiers.length === 0)) {
+  const resolvedTiers: DonationTier[] = Array.isArray(tiers)
+    ? tiers
+    : (tiers?.bob && tiers.bob.length > 0 ? tiers.bob : tiers?.usd || []);
+
+  if ((!impactItems || impactItems.length === 0) && (!resolvedTiers || resolvedTiers.length === 0)) {
     return null;
   }
 
   const items = impactItems && impactItems.length > 0
     ? impactItems
-    : (tiers || []).slice(0, 4).map((t, idx) => ({
+    : resolvedTiers.slice(0, 4).map((t, idx) => ({
         icon: idx === 0 ? 'heart' : idx === 1 ? 'pill' : idx === 2 ? 'home' : 'book',
         title: t.label,
-        description: `Tu aporte de Bs. ${t.amount} genera un impacto tangible y directo.`,
-        stat_highlight: `Bs. ${t.amount}`,
+        description: `Tu aporte de ${t.currency === 'USD' ? '$' : 'Bs.'} ${t.amount} genera un impacto tangible y directo.`,
+        stat_highlight: `${t.currency === 'USD' ? '$' : 'Bs.'} ${t.amount}`,
       }));
 
   return (

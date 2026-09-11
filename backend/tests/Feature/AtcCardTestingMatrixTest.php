@@ -137,15 +137,6 @@ class AtcCardTestingMatrixTest extends TestCase
     public function test_scenario_3_monthly_subscription_with_null_customer_id(): void
     {
         $mockAdapter = Mockery::mock(AtcCybersourceAdapter::class);
-        $mockAdapter->shouldReceive('tokenizeCard')
-            ->once()
-            ->andReturn([
-                'payment_instrument_id' => 'tms_inst_11223344',
-                'customer_id'           => null, // Verificamos que no lance error por ser null
-                'card_last_four'        => '9010',
-                'card_brand'            => 'VISA',
-            ]);
-
         $mockAdapter->shouldReceive('processCheckout')
             ->once()
             ->andReturn([
@@ -153,6 +144,8 @@ class AtcCardTestingMatrixTest extends TestCase
                 'gateway_transaction_id'    => 'tx_sub_initial_01',
                 'cybersource_request_id'    => '7718492049281948291077',
                 'merchant_reference_number' => 'REF-FNE-SUB-003',
+                'tms_payment_instrument_id' => 'tms_inst_11223344',
+                'tms_customer_id'           => null,
             ]);
 
         $this->app->instance(AtcCybersourceAdapter::class, $mockAdapter);
