@@ -172,6 +172,7 @@ export const DonationWidget: React.FC = () => {
 
   const [successModalData, setSuccessModalData] = useState<{
     amount: number;
+    currency?: string;
     frequency: 'single' | 'monthly';
     referenceNumber: string;
     receiptUrl: string | null;
@@ -316,6 +317,7 @@ export const DonationWidget: React.FC = () => {
 
     setSuccessModalData({
       amount: currentAmount,
+      currency: currency === 'Bs' ? 'BOB' : 'USD',
       frequency,
       referenceNumber: checkoutResult.merchant_reference_number || refNumber,
       receiptUrl: checkoutResult.receipt_url || null,
@@ -513,6 +515,7 @@ export const DonationWidget: React.FC = () => {
             setQrModalData(null);
             setSuccessModalData({
               amount: currentAmount,
+              currency: 'BOB',
               frequency: 'single',
               referenceNumber: qrModalData.qr.merchant_reference_number,
               receiptUrl: receiptUrl || null,
@@ -527,6 +530,7 @@ export const DonationWidget: React.FC = () => {
         <DonationSuccessModal
           tenant={tenant}
           amount={successModalData.amount}
+          currency={successModalData.currency}
           frequency={successModalData.frequency}
           referenceNumber={successModalData.referenceNumber}
           receiptUrl={successModalData.receiptUrl}

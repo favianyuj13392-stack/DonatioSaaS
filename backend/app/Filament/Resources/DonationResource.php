@@ -8,6 +8,7 @@ use Filament\Forms;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Support\Facades\URL;
 
 class DonationResource extends Resource
 {
@@ -179,7 +180,12 @@ class DonationResource extends Resource
                 Tables\Actions\Action::make('receipt')
                     ->label('Recibo')
                     ->icon('heroicon-o-document-arrow-down')
-                    ->url(fn (Donation $record): string => route('donations.receipt', ['id' => $record->id]))
+                    ->url(fn (Donation $record): string => URL::temporarySignedRoute(
+                        'donations.receipt',
+                        now()->addDays(30),
+                        ['id' => $record->id],
+                        absolute: false
+                    ))
                     ->openUrlInNewTab(),
             ]);
     }

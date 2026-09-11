@@ -72,7 +72,7 @@ export const DonationSuccessModal: React.FC<DonationSuccessModalProps> = ({
         </h3>
 
         <p className="text-xs sm:text-sm text-slate-600 mb-6 leading-relaxed">
-          Tu aporte de <strong>Bs. {amount.toLocaleString('es-BO', { minimumFractionDigits: 2 })}</strong> a <strong>{tenant.name}</strong> ya está haciendo posible continuar con nuestra labor solidaria.
+          Tu aporte de <strong>{currency === 'USD' ? '$' : 'Bs.'} {amount.toLocaleString('es-BO', { minimumFractionDigits: 2 })}</strong> a <strong>{tenant.name}</strong> ya está haciendo posible continuar con nuestra labor solidaria.
         </p>
 
         {/* Resumen Limpio del Aporte */}

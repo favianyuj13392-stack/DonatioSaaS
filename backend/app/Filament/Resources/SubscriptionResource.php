@@ -53,7 +53,8 @@ class SubscriptionResource extends Resource
 
                 Tables\Columns\TextColumn::make('amount')
                     ->label('Aporte Mensual')
-                    ->money('BOB')
+                    ->state(fn (Subscription $record): string => "{$record->currency} " . number_format((float) $record->amount, 2))
+                    ->weight('bold')
                     ->sortable(),
 
                 Tables\Columns\TextColumn::make('card_info')
@@ -104,6 +105,13 @@ class SubscriptionResource extends Resource
                 Tables\Filters\SelectFilter::make('foundation_id')
                     ->label('Filtrar por Fundación')
                     ->relationship('foundation', 'name'),
+
+                Tables\Filters\SelectFilter::make('currency')
+                    ->label('Moneda')
+                    ->options([
+                        'BOB' => 'Bolivianos (BOB)',
+                        'USD' => 'Dólares (USD)',
+                    ]),
 
                 Tables\Filters\SelectFilter::make('status')
                     ->label('Filtrar por Estado')

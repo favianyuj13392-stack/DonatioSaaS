@@ -263,7 +263,7 @@
             <div class="amount-label">Monto Total Donado</div>
             <div class="amount-val">{{ $donation->currency }} {{ number_format((float) $donation->amount, 2) }}</div>
             <div class="amount-sub">
-                @if($donation->donation_type === 'recurring')
+                @if(in_array($donation->donation_type, ['recurring', 'subscription_initial', 'subscription_recurring']))
                     Aporte Solidario Mensual Recurrente
                 @else
                     Aporte Solidario Único

@@ -484,7 +484,8 @@ class DonationCheckoutController extends Controller
                         'receipt_url'               => URL::temporarySignedRoute(
                             'donations.receipt',
                             now()->addDays(30),
-                            ['id' => $donation->id]
+                            ['id' => $donation->id],
+                            absolute: false
                         ),
                     ]);
                 });
@@ -609,7 +610,7 @@ class DonationCheckoutController extends Controller
             'status'      => $donation->status,
             'paid_at'     => $donation->paid_at,
             'receipt_url' => $donation->status === 'completed'
-                ? URL::temporarySignedRoute('donations.receipt', now()->addDays(30), ['id' => $donation->id])
+                ? URL::temporarySignedRoute('donations.receipt', now()->addDays(30), ['id' => $donation->id], absolute: false)
                 : null,
         ]);
     }

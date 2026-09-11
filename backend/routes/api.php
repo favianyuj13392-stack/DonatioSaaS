@@ -44,7 +44,7 @@ Route::prefix('v1')->group(function () {
     // 2. Rutas Públicas de Recibos y Comprobantes de Donación (Sin dependencia de subdominio)
     Route::middleware(['throttle:60,1'])->group(function () {
         Route::get('/donations/{id}/receipt', [DonationCheckoutController::class, 'downloadReceipt'])
-            ->middleware(['signed'])
+            ->middleware(['signed:relative'])
             ->name('donations.receipt');
     });
 
