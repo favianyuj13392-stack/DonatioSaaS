@@ -7,6 +7,7 @@ import { ThreatMetrixScript } from './ThreatMetrixScript';
 import { CardinalDataCollector } from './CardinalDataCollector';
 import { StepUpChallengeModal } from './StepUpChallengeModal';
 import { LegalTermsModal } from './LegalTermsModal';
+import { useMarketingTracker } from '../hooks/useMarketingTracker';
 import {
   generateQrDonation,
   setup3dsSession,
@@ -29,6 +30,7 @@ import {
 
 export const DonationWidget: React.FC = () => {
   const { tenant, campaign, subdomain, refreshData } = useTenant();
+  const { getUtmData, clearUtmData } = useMarketingTracker();
 
   const defaultBobTiers: DonationTier[] = [
     { amount: 50, label: 'Aporte de apoyo continuo', is_default: false },
@@ -311,6 +313,7 @@ export const DonationWidget: React.FC = () => {
       xid: auth3ds?.xid || null,
       three_ds_server_transaction_id: auth3ds?.threeDSServerTransactionId || null,
       accepted_terms: true,
+      ...getUtmData(),
     };
 
     const checkoutResult = await submitCheckout(subdomain, checkoutPayload);
@@ -323,6 +326,7 @@ export const DonationWidget: React.FC = () => {
       receiptUrl: checkoutResult.receipt_url || null,
     });
 
+    clearUtmData();
     refreshData();
   };
 
@@ -371,8 +375,10 @@ export const DonationWidget: React.FC = () => {
           donor_name: cardData.cardholderName.trim() || 'Donante Solidario',
           donor_email: cardData.email.trim() || 'donante@donatio.lat',
           is_anonymous: false,
+          ...getUtmData(),
         });
 
+        clearUtmData(); // We assume QR completion is tracked asynchronously via webhook, but user flow ends here for this session.
         setQrModalData(qrRes);
       } else {
         const cleanCard = cardData.cardNumber.replace(/\s+/g, '');

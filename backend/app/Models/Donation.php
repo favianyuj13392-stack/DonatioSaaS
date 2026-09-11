@@ -32,6 +32,11 @@ class Donation extends Model
         'payment_method',
         'donation_type',
         'status',
+        'utm_source',
+        'utm_medium',
+        'utm_campaign',
+        'utm_content',
+        'is_commissionable',
         'is_anonymous',
         'ip_address',
         'user_agent',
@@ -40,6 +45,7 @@ class Donation extends Model
     ];
 
     protected $casts = [
+        'is_commissionable'           => 'boolean',
         'amount'                      => 'decimal:2',
         'amount_bob'                  => 'decimal:2',
         'amount_usd'                  => 'decimal:2',

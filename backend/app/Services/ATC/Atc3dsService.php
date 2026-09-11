@@ -403,6 +403,20 @@ class Atc3dsService
             97 => self::sanitizeMddValue($mdd97, 50),
         ];
 
+        // UTM tracking variables as custom MDDs (98 to 101)
+        if (!empty($data['utm_source'])) {
+            $rawMdds[98] = self::sanitizeMddValue('utm_source:' . $data['utm_source'], 100);
+        }
+        if (!empty($data['utm_campaign'])) {
+            $rawMdds[99] = self::sanitizeMddValue('utm_campaign:' . $data['utm_campaign'], 100);
+        }
+        if (!empty($data['utm_medium'])) {
+            $rawMdds[100] = self::sanitizeMddValue('utm_medium:' . $data['utm_medium'], 100);
+        }
+        if (!empty($data['utm_content'])) {
+            $rawMdds[101] = self::sanitizeMddValue('utm_content:' . $data['utm_content'], 100);
+        }
+
         $formatted = [];
         foreach ($rawMdds as $key => $val) {
             $formatted[] = [
