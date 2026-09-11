@@ -282,6 +282,10 @@ class DonationCheckoutController extends Controller
             'xid'                            => 'nullable|string',
             'three_ds_server_transaction_id' => 'nullable|string',
             'accepted_terms'                 => 'nullable|boolean',
+            'utm_source'                     => 'nullable|string|max:255',
+            'utm_medium'                     => 'nullable|string|max:255',
+            'utm_campaign'                   => 'nullable|string|max:255',
+            'utm_content'                    => 'nullable|string|max:255',
         ]);
 
         $merchantRef = $validated['merchant_reference_number'];
@@ -404,6 +408,13 @@ class DonationCheckoutController extends Controller
                     // 4. Calcular comisiones inmutables del tenant en base a la moneda nacional (BOB)
                     $settlement = $tenant->calculateSettlement($amountBob, 'card');
 
+                    // Check if commissionable
+                    $isCommissionable = false;
+                    if (!empty($validated['utm_campaign'])) {
+                        // For now we check if it has a utm_campaign, logic can be expanded
+                        $isCommissionable = true;
+                    }
+
                     // 5. Guardar Donación
                     $donation = Donation::create([
                         'foundation_id'               => $tenant->id,
@@ -425,6 +436,11 @@ class DonationCheckoutController extends Controller
                         'payment_method'              => 'card',
                         'donation_type'               => $validated['frequency'] === 'monthly' ? 'subscription_initial' : 'single',
                         'status'                      => 'completed',
+                        'utm_source'                  => $validated['utm_source'] ?? null,
+                        'utm_medium'                  => $validated['utm_medium'] ?? null,
+                        'utm_campaign'                => $validated['utm_campaign'] ?? null,
+                        'utm_content'                 => $validated['utm_content'] ?? null,
+                        'is_commissionable'           => $isCommissionable,
                         'is_anonymous'                => $isAnonymous,
                         'ip_address'                  => $request->ip(),
                         'user_agent'                  => $request->userAgent(),
@@ -524,6 +540,10 @@ class DonationCheckoutController extends Controller
             'donor_email'    => 'nullable|email',
             'is_anonymous'   => 'boolean',
             'accepted_terms' => 'nullable|boolean',
+            'utm_source'     => 'nullable|string|max:255',
+            'utm_medium'     => 'nullable|string|max:255',
+            'utm_campaign'   => 'nullable|string|max:255',
+            'utm_content'    => 'nullable|string|max:255',
         ]);
 
         $donor = null;
@@ -542,6 +562,12 @@ class DonationCheckoutController extends Controller
         // Pre-calcular comisiones de liquidación para QR (en BOB)
         $settlement = $tenant->calculateSettlement($amountBob, 'qr');
 
+        // Check if commissionable
+        $isCommissionable = false;
+        if (!empty($validated['utm_campaign'])) {
+            $isCommissionable = true;
+        }
+
         // Crear donación pendiente inicial
         $donation = Donation::create([
             'foundation_id'               => $tenant->id,
@@ -559,6 +585,11 @@ class DonationCheckoutController extends Controller
             'payment_method'              => 'qr',
             'donation_type'               => 'single',
             'status'                      => 'pending',
+            'utm_source'                  => $validated['utm_source'] ?? null,
+            'utm_medium'                  => $validated['utm_medium'] ?? null,
+            'utm_campaign'                => $validated['utm_campaign'] ?? null,
+            'utm_content'                 => $validated['utm_content'] ?? null,
+            'is_commissionable'           => $isCommissionable,
             'is_anonymous'                => $validated['is_anonymous'] ?? false,
         ]);
 

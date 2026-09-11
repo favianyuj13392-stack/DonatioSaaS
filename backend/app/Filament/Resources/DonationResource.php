@@ -95,6 +95,26 @@ class DonationResource extends Resource
                         default => $state,
                     }),
 
+                Tables\Columns\IconColumn::make('is_commissionable')
+                    ->label('Comisión Mkt')
+                    ->boolean()
+                    ->trueIcon('heroicon-o-check-circle')
+                    ->falseIcon('heroicon-o-x-circle')
+                    ->tooltip(fn (Donation $record): string => $record->utm_campaign ? "Campaña: {$record->utm_campaign}" : 'Donación orgánica')
+                    ->sortable(),
+
+                Tables\Columns\TextColumn::make('utm_source')
+                    ->label('Origen Mkt')
+                    ->searchable()
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
+
+                Tables\Columns\TextColumn::make('utm_campaign')
+                    ->label('Campaña Mkt')
+                    ->searchable()
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
+
                 Tables\Columns\TextColumn::make('donation_type')
                     ->label('Tipo')
                     ->badge()
@@ -162,6 +182,10 @@ class DonationResource extends Resource
                         'subscription_recurring' => 'Suscripción Recurrente',
                         'subscription_initial'   => 'Alta de Socio',
                     ]),
+                Tables\Filters\TernaryFilter::make('is_commissionable')
+                    ->label('Filtrar por Origen')
+                    ->trueLabel('Marketing (Comisionables)')
+                    ->falseLabel('Orgánicas (Sin Comisión)'),
             ])
             ->actions([
                 // Ver Raw JSONB devuelto por Cybersource

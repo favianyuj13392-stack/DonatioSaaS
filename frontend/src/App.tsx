@@ -16,9 +16,11 @@ import { ReactivationPage } from './components/ReactivationPage';
 import { CampaignsListPage } from './components/CampaignsListPage';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { AlertCircle } from 'lucide-react';
+import { useMarketingTracker } from './hooks/useMarketingTracker';
 
 const MainLayout: React.FC = () => {
   const { tenant, campaign, otherCampaigns, routeMode, isLoading, error } = useTenant();
+  useMarketingTracker(); // Track UTMs immediately when layout mounts
 
   if (isLoading) {
     return <SkeletonLoader />;
