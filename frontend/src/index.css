@@ -209,6 +209,18 @@ body {
   box-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.15);
 }
 
+/* Infinite marquee for CorporatePartnersMarquee */
+@keyframes marquee-scroll {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+.animate-marquee {
+  animation: marquee-scroll 28s linear infinite;
+}
+.animate-marquee:hover {
+  animation-play-state: paused;
+}
+
 /* ─────────────────────────────────────────
    Accessibility
 ───────────────────────────────────────── */
