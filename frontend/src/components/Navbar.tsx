@@ -5,6 +5,20 @@ import { ShieldCheck, Menu, X, Heart } from 'lucide-react';
 export const Navbar: React.FC = () => {
   const { tenant, campaign, routeMode, navigateToHome, navigateToCampaigns } = useTenant();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+  const [showMobileCta, setShowMobileCta] = useState(false);
+
+  // Track scroll — mobile sticky CTA appears after hero clears viewport
+  useEffect(() => {
+    if (routeMode !== 'campaign') return;
+    const handleScroll = () => {
+      const threshold = window.innerHeight * 0.7;
+      setScrolled(window.scrollY > 60);
+      setShowMobileCta(window.scrollY > threshold);
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [routeMode]);
 
   useEffect(() => {
     if (!mobileMenuOpen) return;
@@ -31,6 +45,11 @@ export const Navbar: React.FC = () => {
   const hasImpact = !!(campaign?.tangible_impact_items && campaign.tangible_impact_items.length > 0);
   const hasTransparency = !!(campaign?.funds_breakdown && campaign.funds_breakdown.length > 0);
 
+  const isCampaignMode = routeMode === 'campaign';
+  const progressPct = isCampaignMode && campaign && campaign.monetary_goal > 0
+    ? Math.min(100, Math.round(campaign.progress_percentage ?? (campaign.current_amount / campaign.monetary_goal) * 100))
+    : 0;
+
   const scrollToSection = (id: string) => {
     setMobileMenuOpen(false);
     const element = document.getElementById(id);
@@ -45,203 +64,241 @@ export const Navbar: React.FC = () => {
   };
 
   return (
-    <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-100 py-3 shadow-xs">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between">
-          
-          {/* Logo e Identidad Institucional */}
-          <button
-            type="button"
-            onClick={navigateToHome}
-            className="flex items-center gap-3 text-left focus:outline-hidden group"
-          >
-            {tenant.logo_url ? (
-              <img
-                src={tenant.logo_url}
-                alt={tenant.name}
-                className="h-9 sm:h-10 w-auto object-contain max-w-[150px] group-hover:opacity-90 transition"
-              />
-            ) : (
-              <div className="w-9 h-9 rounded-xl bg-[var(--tenant-primary)] text-[var(--tenant-on-primary)] flex items-center justify-center font-black text-base shadow-xs">
-                {tenant.code?.slice(0, 2) || 'ON'}
-              </div>
-            )}
-            <div>
-              <span className="text-sm sm:text-base font-black text-slate-900 leading-tight block group-hover:text-[var(--tenant-primary)] transition">
-                {tenant.name}
-              </span>
-              <div className="flex items-center gap-1 text-[11px] font-semibold text-emerald-700">
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 inline" />
-                <span>Portal Verificado</span>
-              </div>
-            </div>
-          </button>
+    <>
+      <header
+        className={`sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-100 py-3 transition-shadow duration-300 ${scrolled ? 'shadow-sm' : 'shadow-xs'}`}
+      >
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between">
 
-          {/* Menú de Navegación Desktop */}
-          <nav className="hidden lg:flex items-center gap-6 text-xs sm:text-sm font-bold text-slate-600">
+            {/* Logo e Identidad Institucional */}
             <button
               type="button"
               onClick={navigateToHome}
-              className={`hover:text-[var(--tenant-primary)] transition ${routeMode === 'institutional' ? 'text-[var(--tenant-primary)] font-black' : ''}`}
+              className="flex items-center gap-3 text-left focus:outline-hidden group"
+            >
+              {tenant.logo_url ? (
+                <img
+                  src={tenant.logo_url}
+                  alt={tenant.name}
+                  className="h-9 sm:h-10 w-auto object-contain max-w-[150px] group-hover:opacity-90 transition"
+                />
+              ) : (
+                <div className="w-9 h-9 rounded-xl bg-[var(--tenant-primary)] text-[var(--tenant-on-primary)] flex items-center justify-center font-black text-base shadow-xs">
+                  {tenant.code?.slice(0, 2) || 'ON'}
+                </div>
+              )}
+              <div>
+                <span className="text-sm sm:text-base font-black text-slate-900 leading-tight block group-hover:text-[var(--tenant-primary)] transition">
+                  {tenant.name}
+                </span>
+                <div className="flex items-center gap-1 text-[11px] font-semibold text-emerald-700">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 inline" />
+                  <span>Portal Verificado</span>
+                </div>
+              </div>
+            </button>
+
+            {/* Menú de Navegación Desktop */}
+            <nav className="hidden lg:flex items-center gap-6 text-xs sm:text-sm font-bold text-slate-600">
+              <button
+                type="button"
+                onClick={navigateToHome}
+                className={`hover:text-[var(--tenant-primary)] transition ${routeMode === 'institutional' ? 'text-[var(--tenant-primary)] font-black' : ''}`}
+              >
+                Inicio
+              </button>
+
+              {hasAbout && (
+                <button
+                  type="button"
+                  onClick={() => scrollToSection('quienes-somos')}
+                  className="hover:text-[var(--tenant-primary)] transition"
+                >
+                  Quiénes somos
+                </button>
+              )}
+
+              {hasPrograms && (
+                <button
+                  type="button"
+                  onClick={() => scrollToSection('programas')}
+                  className="hover:text-[var(--tenant-primary)] transition"
+                >
+                  Qué hacemos
+                </button>
+              )}
+
+              {hasImpact && (
+                <button
+                  type="button"
+                  onClick={() => scrollToSection('impacto')}
+                  className="hover:text-[var(--tenant-primary)] transition"
+                >
+                  Impacto
+                </button>
+              )}
+
+              {hasTransparency && (
+                <button
+                  type="button"
+                  onClick={() => scrollToSection('transparencia')}
+                  className="hover:text-[var(--tenant-primary)] transition"
+                >
+                  Transparencia
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={navigateToCampaigns}
+                className={`hover:text-[var(--tenant-primary)] transition ${routeMode === 'campaigns_list' ? 'text-[var(--tenant-primary)] font-black' : ''}`}
+              >
+                Campañas
+              </button>
+
+              <button
+                type="button"
+                onClick={() => scrollToSection('contacto')}
+                className="hover:text-[var(--tenant-primary)] transition"
+              >
+                Contacto
+              </button>
+            </nav>
+
+            {/* Botón Donar Ahora Desktop */}
+            <div className="hidden lg:flex items-center gap-3">
+              <button
+                type="button"
+                onClick={scrollToDonate}
+                className="btn-tenant-primary inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold shadow-xs active:scale-95 transition"
+              >
+                <Heart className="w-4 h-4 fill-current" />
+                <span>Donar ahora</span>
+              </button>
+            </div>
+
+            {/* Botón Menú Mobile */}
+            <div className="flex lg:hidden items-center gap-2">
+              <button
+                type="button"
+                onClick={scrollToDonate}
+                className="btn-tenant-primary px-3 py-1.5 rounded-lg text-xs font-bold"
+              >
+                Donar
+              </button>
+              <button
+                type="button"
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                className="p-2 text-slate-600 hover:text-slate-900 rounded-lg"
+                aria-label={mobileMenuOpen ? 'Cerrar menú' : 'Abrir menú'}
+                aria-expanded={mobileMenuOpen}
+                aria-controls="mobile-nav-menu"
+              >
+                {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+              </button>
+            </div>
+
+          </div>
+        </div>
+
+        {/* ── Campaign progress bar — thin line at bottom edge of navbar ── */}
+        {isCampaignMode && progressPct > 0 && (
+          <div
+            className="absolute bottom-0 left-0 right-0 h-[3px] bg-slate-100"
+            aria-hidden="true"
+          >
+            <div
+              className="h-full transition-all duration-1000 ease-out"
+              style={{ width: `${progressPct}%`, backgroundColor: 'var(--tenant-primary)' }}
+            />
+          </div>
+        )}
+
+        {/* Menú Desplegable Mobile */}
+        {mobileMenuOpen && (
+          <div id="mobile-nav-menu" role="navigation" aria-label="Navegación móvil" className="md:hidden bg-white border-b border-slate-200 px-4 pt-3 pb-5 space-y-3">
+            <button
+              type="button"
+              onClick={() => { setMobileMenuOpen(false); navigateToHome(); }}
+              className="block w-full text-left py-3 text-sm font-bold text-slate-700"
             >
               Inicio
             </button>
-
             {hasAbout && (
               <button
                 type="button"
                 onClick={() => scrollToSection('quienes-somos')}
-                className="hover:text-[var(--tenant-primary)] transition"
+                className="block w-full text-left py-3 text-sm font-bold text-slate-700"
               >
                 Quiénes somos
               </button>
             )}
-
             {hasPrograms && (
               <button
                 type="button"
                 onClick={() => scrollToSection('programas')}
-                className="hover:text-[var(--tenant-primary)] transition"
+                className="block w-full text-left py-3 text-sm font-bold text-slate-700"
               >
                 Qué hacemos
               </button>
             )}
-
             {hasImpact && (
               <button
                 type="button"
                 onClick={() => scrollToSection('impacto')}
-                className="hover:text-[var(--tenant-primary)] transition"
+                className="block w-full text-left py-3 text-sm font-bold text-slate-700"
               >
                 Impacto
               </button>
             )}
-
             {hasTransparency && (
               <button
                 type="button"
                 onClick={() => scrollToSection('transparencia')}
-                className="hover:text-[var(--tenant-primary)] transition"
+                className="block w-full text-left py-3 text-sm font-bold text-slate-700"
               >
                 Transparencia
               </button>
             )}
-
             <button
               type="button"
-              onClick={navigateToCampaigns}
-              className={`hover:text-[var(--tenant-primary)] transition ${routeMode === 'campaigns_list' ? 'text-[var(--tenant-primary)] font-black' : ''}`}
+              onClick={() => { setMobileMenuOpen(false); navigateToCampaigns(); }}
+              className="block w-full text-left py-3 text-sm font-bold text-slate-700"
             >
               Campañas
             </button>
-
             <button
               type="button"
               onClick={() => scrollToSection('contacto')}
-              className="hover:text-[var(--tenant-primary)] transition"
+              className="block w-full text-left py-3 text-sm font-bold text-slate-700"
             >
               Contacto
             </button>
-          </nav>
-
-          {/* Botón Donar Ahora Desktop */}
-          <div className="hidden lg:flex items-center gap-3">
-            <button
-              type="button"
-              onClick={scrollToDonate}
-              className="btn-tenant-primary inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold shadow-xs active:scale-95 transition"
-            >
-              <Heart className="w-4 h-4 fill-current" />
-              <span>Donar ahora</span>
-            </button>
           </div>
+        )}
+      </header>
 
-          {/* Botón Menú Mobile */}
-          <div className="flex lg:hidden items-center gap-2">
-            <button
-              type="button"
-              onClick={scrollToDonate}
-              className="btn-tenant-primary px-3 py-1.5 rounded-lg text-xs font-bold"
-            >
-              Donar
-            </button>
-            <button
-              type="button"
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-2 text-slate-600 hover:text-slate-900 rounded-lg"
-              aria-label={mobileMenuOpen ? 'Cerrar menú' : 'Abrir menú'}
-              aria-expanded={mobileMenuOpen}
-              aria-controls="mobile-nav-menu"
-            >
-              {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-            </button>
-          </div>
-
-        </div>
-      </div>
-
-      {/* Menú Desplegable Mobile */}
-      {mobileMenuOpen && (
-        <div id="mobile-nav-menu" role="navigation" aria-label="Navegación móvil" className="md:hidden bg-white border-b border-slate-200 px-4 pt-3 pb-5 space-y-3">
+      {/* ── Mobile sticky donate CTA — fixed bottom, slides up after hero ── */}
+      {isCampaignMode && (
+        <div
+          className={`lg:hidden fixed bottom-0 left-0 right-0 z-40 px-4 transition-all duration-300 ease-out ${showMobileCta ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0'}`}
+          style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
+          aria-hidden={!showMobileCta}
+        >
           <button
             type="button"
-            onClick={() => { setMobileMenuOpen(false); navigateToHome(); }}
-            className="block w-full text-left py-3 text-sm font-bold text-slate-700"
+            onClick={scrollToDonate}
+            className="w-full btn-tenant-primary py-4 rounded-2xl font-black text-base shadow-xl flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
           >
-            Inicio
-          </button>
-          {hasAbout && (
-            <button
-              type="button"
-              onClick={() => scrollToSection('quienes-somos')}
-              className="block w-full text-left py-3 text-sm font-bold text-slate-700"
-            >
-              Quiénes somos
-            </button>
-          )}
-          {hasPrograms && (
-            <button
-              type="button"
-              onClick={() => scrollToSection('programas')}
-              className="block w-full text-left py-3 text-sm font-bold text-slate-700"
-            >
-              Qué hacemos
-            </button>
-          )}
-          {hasImpact && (
-            <button
-              type="button"
-              onClick={() => scrollToSection('impacto')}
-              className="block w-full text-left py-3 text-sm font-bold text-slate-700"
-            >
-              Impacto
-            </button>
-          )}
-          {hasTransparency && (
-            <button
-              type="button"
-              onClick={() => scrollToSection('transparencia')}
-              className="block w-full text-left py-3 text-sm font-bold text-slate-700"
-            >
-              Transparencia
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={() => { setMobileMenuOpen(false); navigateToCampaigns(); }}
-            className="block w-full text-left py-3 text-sm font-bold text-slate-700"
-          >
-            Campañas
-          </button>
-          <button
-            type="button"
-            onClick={() => scrollToSection('contacto')}
-            className="block w-full text-left py-3 text-sm font-bold text-slate-700"
-          >
-            Contacto
+            <Heart className="w-5 h-5 fill-current" />
+            <span>Donar ahora</span>
+            {progressPct > 0 && (
+              <span className="ml-1 text-xs font-bold opacity-75">· {progressPct}% alcanzado</span>
+            )}
           </button>
         </div>
       )}
-    </header>
+    </>
   );
 };
