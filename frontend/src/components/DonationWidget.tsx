@@ -344,7 +344,7 @@ export const DonationWidget: React.FC = () => {
   const heroQuote = campaign?.headline || `"Con tu ayuda, transformamos futuros"`;
 
   return (
-    <div id="donar" className="w-full max-w-6xl mx-auto my-8 px-4 sm:px-6">
+    <div id="donar" className="w-full donation-widget-shell">
       {/* Servicios invisibles de riesgo y perfilado */}
       <ThreatMetrixScript onSessionGenerated={(sid: string) => setFingerprintSessionId(sid)} />
       {cardinalJwt && <CardinalDataCollector jwt={cardinalJwt} />}
@@ -406,10 +406,10 @@ export const DonationWidget: React.FC = () => {
       />
 
       {/* CONTENEDOR PRINCIPAL 2 COLUMNAS (MOCKUP CERTIFICADO) */}
-      <div className="bg-white rounded-3xl shadow-2xl border border-gray-100 overflow-hidden grid grid-cols-1 md:grid-cols-12">
+      <div className="donation-widget-panel bg-white rounded-3xl shadow-2xl border border-gray-100 overflow-hidden grid grid-cols-1 md:grid-cols-12">
         
         {/* COLUMNA IZQUIERDA: FORMULARIO INTERACTIVO (7 COLUMNAS) */}
-        <div className="md:col-span-7 p-5 sm:p-7 md:p-8 space-y-5">
+        <div className="donation-widget-form md:col-span-7 p-5 sm:p-7 md:p-8 space-y-5">
           <div>
             <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">Tu donación</h2>
             <p className="text-xs sm:text-sm text-gray-500 mt-1">Tu ayuda hace la diferencia. Elige el monto y la frecuencia de tu donación.</p>
@@ -652,7 +652,7 @@ export const DonationWidget: React.FC = () => {
         </div>
 
         {/* COLUMNA DERECHA: RESUMEN DE DONACIÓN (5 COLUMNAS - STICKY) */}
-        <div className="md:col-span-5 bg-gray-50/80 border-t md:border-t-0 md:border-l border-gray-100 p-5 sm:p-6 flex flex-col justify-between">
+        <div className="donation-widget-summary md:col-span-5 bg-gray-50/80 border-t md:border-t-0 md:border-l border-gray-100 p-5 sm:p-6 flex flex-col justify-between">
           <div className="space-y-5">
             <h3 className="text-base sm:text-lg font-bold text-gray-900">Resumen de tu donación</h3>
 

@@ -60,7 +60,14 @@ export const Navbar: React.FC = () => {
 
   const scrollToDonate = () => {
     setMobileMenuOpen(false);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    const donationSection = document.getElementById('donacion');
+
+    if (donationSection) {
+      donationSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
+
+    window.location.assign(`/?tenant=${encodeURIComponent(tenant.subdomain)}#donacion`);
   };
 
   return (
@@ -94,7 +101,7 @@ export const Navbar: React.FC = () => {
                 </span>
                 <div className="flex items-center gap-1 text-[11px] font-semibold text-emerald-700">
                   <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 inline" />
-                  <span>Portal Verificado</span>
+                  <span>Portal de donaciones</span>
                 </div>
               </div>
             </button>
