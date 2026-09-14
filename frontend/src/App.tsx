@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { lazy, Suspense } from 'react';
 import { TenantProvider, useTenant } from './context/TenantContext';
 import { Navbar } from './components/Navbar';
 import { HeroSection } from './components/HeroSection';
@@ -16,6 +16,8 @@ import { ReactivationPage } from './components/ReactivationPage';
 import { CampaignsListPage } from './components/CampaignsListPage';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { AlertCircle } from 'lucide-react';
+
+const DonatioLanding = lazy(() => import('./pages/DonatioLanding'));
 
 const MainLayout: React.FC = () => {
   const { tenant, campaign, otherCampaigns, routeMode, isLoading, error } = useTenant();
@@ -65,82 +67,50 @@ const MainLayout: React.FC = () => {
     );
   }
 
-  const testimonialData = campaign?.testimonial || tenant.testimonial || null;
+  const testimonialData = campaign?.testimonial?.quote?.trim()
+    ? campaign.testimonial
+    : tenant.testimonial?.quote?.trim() ? tenant.testimonial : null;
 
   return (
     <div className="min-h-screen flex flex-col bg-white antialiased selection:bg-[var(--tenant-primary)] selection:text-white">
-      {/* ========================================================================= */}
-      {/* ZONE 1: TOP (Navbar Oficial + Adaptive Hero & Donation Flow)              */}
-      {/* ========================================================================= */}
-      <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-[100] focus:px-4 focus:py-2 focus:bg-white focus:text-slate-900 focus:rounded-lg focus:shadow-lg focus:font-bold focus:text-sm">
+      <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-[100] focus:px-4 focus:py-2 focus:bg-white focus:text-slate-900 focus:rounded-lg">
         Saltar al contenido principal
       </a>
       <Navbar />
-
-      <main id="main-content" className="flex-1">
+      <main id="main-content" className="flex-1 donatio-page">
         <HeroSection />
-
-      {/* ========================================================================= */}
-      {/* ZONE 2: CONTENT (Quiénes somos, Qué hacemos, Impacto, Historia)           */}
-      {/* ========================================================================= */}
-      
-      {/* 01. QUIÉNES SOMOS (Condicional: solo si existe misión/visión/about/valores) */}
-      <AboutSection />
-
-      {/* 02. QUÉ HACEMOS / PROGRAMAS (Condicional: solo si existen programas) */}
-      <ProgramsSection />
-
-      {/* 03. IMPACTO DEL APORTE (Condicional: solo si existen tiers o items de impacto) */}
-      <ImpactGridSection
-        impactItems={campaign?.tangible_impact_items}
-        tiers={campaign?.donation_tiers}
-      />
-
-      {/* 04. HISTORIA HUMANA / PROBLEMA (Condicional: con o sin testimonio integrado) */}
-      {campaign?.story_markdown && (
+        <div id="journal-content" />
         <StoryEditorialSection
-          storyMarkdown={campaign.story_markdown}
-          storyImageUrl={campaign.story_image_url}
+          storyMarkdown={campaign?.story_markdown}
+          storyImageUrl={campaign?.story_image_url}
           locationCity={tenant.location_city}
           testimonial={testimonialData}
         />
-      )}
-
-      {/* ========================================================================= */}
-      {/* ZONE 3: TRUST (Transparencia, Resultados comprobados, Aliados)            */}
-      {/* ========================================================================= */}
-
-      {/* 05. TRANSPARENCIA (Condicional: solo si existe funds_breakdown) */}
-      {campaign?.funds_breakdown && campaign.funds_breakdown.length > 0 && (
-        <TransparencySection fundsBreakdown={campaign.funds_breakdown} />
-      )}
-
-      {/* 06. RESULTADOS / CREDIBILIDAD (Condicional: incluye identidad legal desacoplada) */}
-      {tenant.institutional_metrics && tenant.institutional_metrics.length > 0 && (
+        <ImpactGridSection impactItems={campaign?.tangible_impact_items} tiers={campaign?.donation_tiers} />
+        <ProgramsSection />
         <InstitutionalResultsSection metrics={tenant.institutional_metrics} />
-      )}
-
-      {/* 07. NUESTROS ALIADOS (Condicional: solo si existen aliados registrados) */}
-      {tenant.corporate_partners && tenant.corporate_partners.length > 0 && (
-        <CorporatePartnersMarquee partners={tenant.corporate_partners} />
-      )}
-
-      {/* ========================================================================= */}
-      {/* ZONE 4: CONVERSION (Otras Campañas Activas)                                */}
-      {/* ========================================================================= */}
-      {otherCampaigns && otherCampaigns.length > 0 && <OtherCampaignsSection />}
-
+        <TransparencySection fundsBreakdown={campaign?.funds_breakdown ?? undefined} />
+        <AboutSection />
+        {tenant.corporate_partners && tenant.corporate_partners.length > 0 && (
+          <CorporatePartnersMarquee partners={tenant.corporate_partners} />
+        )}
+        {otherCampaigns && otherCampaigns.length > 0 && <OtherCampaignsSection />}
       </main>
-
-      {/* ========================================================================= */}
-      {/* ZONE 5: SYSTEM (Footer Institucional, Enlaces y Procesamiento Seguro)     */}
-      {/* ========================================================================= */}
       <ContactFooterSection />
     </div>
   );
 };
 
 export const App: React.FC = () => {
+  if (window.location.pathname.replace(/\/+$/, '') === '/donatio') {
+    return (
+      <ErrorBoundary>
+        <Suspense fallback={<div role="status" className="min-h-screen grid place-items-center bg-white text-slate-800">Cargando Donatio…</div>}>
+          <DonatioLanding />
+        </Suspense>
+      </ErrorBoundary>
+    );
+  }
   // Detectar si la ruta actual es de reactivación de socio: /reactivar/:token
   const pathParts = window.location.pathname.split('/');
   if (pathParts[1] === 'reactivar' && pathParts[2]) {
