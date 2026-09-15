@@ -1,4 +1,5 @@
 import React from 'react';
+import { MotionReveal } from './JournalMotion';
 import { useTenant } from '../context/TenantContext';
 import { EditorialIcon, hasText } from './Editorial';
 
@@ -16,7 +17,7 @@ export const ProgramsSection: React.FC = () => {
         </header>
         <div className="journal-programs__list">
           {programs.map((program, index) => (
-            <article className="journal-programs__row" key={program.title + '-' + index}>
+            <MotionReveal index={index} identity={JSON.stringify(program)} className="journal-programs__row" key={program.title + '-' + index}>
               <span className="journal-programs__number" aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>
               <div className="journal-programs__icon"><EditorialIcon name={program.icon} /></div>
               <div className="journal-programs__copy">
@@ -24,7 +25,7 @@ export const ProgramsSection: React.FC = () => {
                 {hasText(program.description) && <p>{program.description}</p>}
               </div>
               {hasText(program.stat) && <strong className={'journal-programs__stat' + (program.stat.trim().length > 12 ? ' journal-programs__stat--compact' : '')}>{program.stat}</strong>}
-            </article>
+            </MotionReveal>
           ))}
         </div>
       </div>

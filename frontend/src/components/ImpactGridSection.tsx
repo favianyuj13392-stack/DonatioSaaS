@@ -1,4 +1,5 @@
 import React from 'react';
+import { MotionReveal } from './JournalMotion';
 import { ArrowUpRight } from 'lucide-react';
 import type { DonationTier, TangibleImpactItem } from '../types';
 import { EditorialIcon, hasText } from './Editorial';
@@ -28,7 +29,7 @@ export const ImpactGridSection: React.FC<Props> = ({ impactItems, tiers }) => {
         </header>
         <div className={'journal-impact__grid' + (items.length === 1 ? ' journal-impact__grid--single' : '')}>
           {items.map((item, index) => (
-            <article className={'journal-impact__card' + (index === 0 ? ' journal-impact__card--featured' : '')} key={item.title + '-' + index}>
+            <MotionReveal index={index} identity={JSON.stringify(item)} className={'journal-impact__card' + (index === 0 ? ' journal-impact__card--featured' : '')} key={item.title + '-' + index}>
               <div className="journal-impact__top"><EditorialIcon name={item.icon} /><span className="journal-index">{String(index + 1).padStart(2, '0')}</span></div>
               <div className="journal-impact__body">
                 {hasText(item.stat_highlight) && <p className="journal-impact__stat">{item.stat_highlight}</p>}
@@ -36,7 +37,7 @@ export const ImpactGridSection: React.FC<Props> = ({ impactItems, tiers }) => {
                 {hasText(item.description) && <p>{item.description}</p>}
               </div>
               <a className="journal-impact__link" href="#donacion">Hacerlo posible <ArrowUpRight size={19} aria-hidden="true" /></a>
-            </article>
+            </MotionReveal>
           ))}
         </div>
       </div>
