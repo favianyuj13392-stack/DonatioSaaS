@@ -2,6 +2,8 @@ import React, { useEffect } from 'react';
 import { ArrowDown, ArrowUpRight } from 'lucide-react';
 import { useTenant } from '../context/TenantContext';
 import { DonationWidget } from './DonationWidget';
+import { AnimatedMetric } from './JournalMotion';
+import { useImageParallax, useViewportProgress } from '../hooks/useJournalMotion';
 import { hasText, positiveNumber, safeLink, scrollToSection } from './Editorial';
 
 export const HeroSection: React.FC = () => {
@@ -11,6 +13,9 @@ export const HeroSection: React.FC = () => {
     const frame = window.requestAnimationFrame(() => scrollToSection('donacion'));
     return () => window.cancelAnimationFrame(frame);
   }, [tenant]);
+  const motionPhoto = [routeMode === 'campaign' ? campaign?.banner_url : null, tenant?.hero_image_url].find(hasText);
+  const parallax = useImageParallax(motionPhoto || '');
+  const donationMotion = useViewportProgress<HTMLDivElement>(JSON.stringify([tenant?.code, campaign?.monetary_goal, campaign?.current_amount, campaign?.progress_percentage]));
   if (!tenant) return null;
   const isCampaign = routeMode === 'campaign' && !!campaign;
   const name = hasText(tenant.name) ? tenant.name.trim() : 'Nuestra organización';
@@ -50,11 +55,11 @@ export const HeroSection: React.FC = () => {
             <span>{name}</span>{hasText(tenant.location_city) && <span>{tenant.location_city}</span>}
           </div>
         </div>
-        <figure className="journal-hero__portrait">
+        <figure ref={parallax.frameRef} className="journal-hero__portrait">
           <div className="journal-hero__fallback" aria-hidden="true">
             <span>{initials}</span><div className="journal-hero__halo" />
           </div>
-          {photo && <img key={photo} className="journal-hero__photo" src={photo} alt={campaignTitle || name} fetchPriority="high" onError={(event) => { event.currentTarget.hidden = true; }} />}
+          {photo && <img key={photo} ref={parallax.imageRef} className="journal-hero__photo journal-motion-photo" src={photo} alt={campaignTitle || name} fetchPriority="high" onError={(event) => { event.currentTarget.hidden = true; }} />}
           <figcaption className="journal-hero__caption">
             <span>{campaignTitle || name}</span><span className="journal-hero__caption-mark" aria-hidden="true">↗</span>
           </figcaption>
@@ -68,12 +73,12 @@ export const HeroSection: React.FC = () => {
           <p className="journal-kicker">Tu aporte importa</p>
           <h2 className="journal-donation__title">Aquí empieza<br /><em>el cambio.</em></h2>
           <p className="journal-donation__description">Elige cómo quieres acompañar esta causa. Cada aporte suma al trabajo de {name}.</p>
-          {goal > 0 && <div className="journal-donation__progress">
-            <div className="journal-donation__progress-heading"><span>Juntos hemos reunido</span><strong>Bs. {formatAmount(raised)}</strong></div>
+          {goal > 0 && <div ref={donationMotion.ref} className="journal-donation__progress">
+            <div className="journal-donation__progress-heading"><span>Juntos hemos reunido</span><strong><AnimatedMetric value={'Bs. ' + formatAmount(raised)} numericValue={raised} formatValue={(value) => 'Bs. ' + formatAmount(value)} /></strong></div>
             <div className="journal-donation__track" role="progressbar" aria-label="Avance de la recaudación" aria-valuenow={Math.min(100, Math.round(progress))} aria-valuemin={0} aria-valuemax={100} aria-valuetext={Math.round(progress) + '% de la meta'}>
-              <span style={{ width: Math.min(100, progress) + '%' }} />
+              <span style={{ width: Math.min(100, progress) * donationMotion.fraction + '%' }} />
             </div>
-            <div className="journal-donation__progress-foot"><span>Meta: Bs. {formatAmount(goal)}</span><span>{Math.round(progress)}%</span></div>
+            <div className="journal-donation__progress-foot"><span>Meta: <AnimatedMetric value={'Bs. ' + formatAmount(goal)} numericValue={goal} formatValue={(value) => 'Bs. ' + formatAmount(value)} /></span><span><AnimatedMetric value={Math.round(progress) + '%'} numericValue={Math.round(progress)} formatValue={(value) => Math.round(value) + '%'} /></span></div>
           </div>}
           <div className="journal-donation__footnote"><span className="journal-donation__currency">Bs. / USD</span><p>Elige tu moneda y revisa los detalles antes de continuar.</p></div>
         </div>
