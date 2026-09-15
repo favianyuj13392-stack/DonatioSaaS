@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useReducedMotion } from './useJournalMotion';
 
 interface UseScrollAnimationOptions {
   threshold?: number;
@@ -10,14 +11,13 @@ export function useScrollAnimation(options: UseScrollAnimationOptions = {}) {
   const { threshold = 0.1, rootMargin = '0px 0px -50px 0px', triggerOnce = true } = options;
   const ref = useRef<HTMLElement>(null);
   const [isVisible, setIsVisible] = useState(false);
+  const reducedMotion = useReducedMotion();
+  const observerAvailable = typeof window !== 'undefined' && typeof window.IntersectionObserver === 'function';
 
   useEffect(() => {
     const element = ref.current;
     if (!element) return;
-
-    // Respect prefers-reduced-motion
-    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (prefersReducedMotion) {
+    if (reducedMotion || !observerAvailable) {
       setIsVisible(true);
       return;
     }
@@ -36,7 +36,7 @@ export function useScrollAnimation(options: UseScrollAnimationOptions = {}) {
 
     observer.observe(element);
     return () => observer.disconnect();
-  }, [threshold, rootMargin, triggerOnce]);
+  }, [threshold, rootMargin, triggerOnce, reducedMotion, observerAvailable]);
 
-  return { ref, isVisible };
+  return { ref, isVisible: reducedMotion || !observerAvailable || isVisible };
 }
