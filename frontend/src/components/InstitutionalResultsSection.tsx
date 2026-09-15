@@ -1,6 +1,7 @@
 import React from 'react';
 import type { InstitutionalMetric } from '../types';
 import { hasText } from './Editorial';
+import { AnimatedMetric } from './JournalMotion';
 
 interface Props { metrics?: (InstitutionalMetric | null)[] | null }
 export const InstitutionalResultsSection: React.FC<Props> = ({ metrics }) => {
@@ -16,7 +17,7 @@ export const InstitutionalResultsSection: React.FC<Props> = ({ metrics }) => {
         </header>
         <dl className="journal-results__grid">
           {items.map((metric, index) => <div className="journal-results__metric" key={metric.label + '-' + index}>
-            <dt>{metric.label}</dt><dd className={String(metric.value).trim().length > 12 ? 'journal-results__value--compact' : undefined}>{String(metric.value)}</dd>
+            <dt>{metric.label}</dt><dd className={String(metric.value).trim().length > 12 ? 'journal-results__value--compact' : undefined}><AnimatedMetric value={String(metric.value)} /></dd>
           </div>)}
         </dl>
       </div>

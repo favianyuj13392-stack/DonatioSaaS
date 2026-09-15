@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import type { TestimonialItem } from '../types';
 import { hasText, safeLink } from './Editorial';
+import { useImageParallax } from '../hooks/useJournalMotion';
 
 interface Props {
   storyMarkdown?: string | null;
@@ -38,6 +39,7 @@ export const StoryEditorialSection: React.FC<Props> = ({ storyMarkdown, storyIma
   const quote = testimonial && hasText(testimonial.quote) ? testimonial : null;
   const photo = [storyImageUrl, quote?.image_url].find(hasText);
   const hasPhoto = !!photo && failedPhoto !== photo;
+  const parallax = useImageParallax(photo || '');
   const location = [quote?.location, locationCity].find(hasText);
   if (!hasText(storyMarkdown) && !quote && !hasPhoto) return null;
   return (
@@ -48,8 +50,8 @@ export const StoryEditorialSection: React.FC<Props> = ({ storyMarkdown, storyIma
           <h2 id="story-title" className="journal-display">Una causa.<br /><em>Historias reales.</em></h2>
         </header>
         <div className={'journal-story__layout' + (hasPhoto ? ' journal-story__layout--image' : '')}>
-          {hasPhoto && <figure className="journal-story__image">
-            <img src={photo} alt={quote?.author_name ? 'Historia de ' + quote.author_name : 'Nuestra causa'} loading="lazy" onError={() => setFailedPhoto(photo!)} />
+          {hasPhoto && <figure ref={parallax.frameRef} className="journal-story__image">
+            <img ref={parallax.imageRef} className="journal-motion-photo" src={photo} alt={quote?.author_name ? 'Historia de ' + quote.author_name : 'Nuestra causa'} loading="lazy" onError={() => setFailedPhoto(photo!)} />
             {location && <figcaption>{location}</figcaption>}
           </figure>}
           <div className="journal-story__text">

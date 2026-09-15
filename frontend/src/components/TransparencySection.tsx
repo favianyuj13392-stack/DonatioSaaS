@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ArrowUpRight } from 'lucide-react';
 import type { FundsBreakdownItem } from '../types';
 import { hasText, positiveNumber } from './Editorial';
+import { useViewportProgress } from '../hooks/useJournalMotion';
 
 interface Props { fundsBreakdown?: (FundsBreakdownItem | null)[] | null }
 const segmentColors = [
@@ -15,6 +16,7 @@ export const TransparencySection: React.FC<Props> = ({ fundsBreakdown }) => {
   const [selected, setSelected] = useState(0);
   const items = Array.isArray(fundsBreakdown)
     ? fundsBreakdown.filter((item): item is FundsBreakdownItem => !!item && hasText(item.category)) : [];
+  const motion = useViewportProgress<HTMLDivElement>(JSON.stringify(items.map((item) => [item.category, item.percentage])));
   if (!items.length) return null;
   const total = items.reduce((sum, item) => sum + positiveNumber(item.percentage), 0);
   const denominator = Math.max(100, total);
@@ -31,7 +33,7 @@ export const TransparencySection: React.FC<Props> = ({ fundsBreakdown }) => {
         </header>
         <div className="journal-transparency__layout">
           <div className="journal-transparency__visual">
-            <div className="journal-transparency__donut">
+            <div ref={motion.ref} className="journal-transparency__donut">
               <svg viewBox="0 0 120 120" role="img" aria-label={'Desglose de fondos. Suma declarada: ' + format(total) + '%.'}>
                 <circle cx="60" cy="60" r="48" fill="none" stroke="var(--journal-line)" strokeWidth="12" />
                 {items.map((item, index) => {
@@ -40,7 +42,7 @@ export const TransparencySection: React.FC<Props> = ({ fundsBreakdown }) => {
                   offset += size;
                   return <circle key={index} cx="60" cy="60" r="48" fill="none" pathLength="100"
                     stroke={segmentColors[index % segmentColors.length]} strokeWidth={index === activeIndex ? 15 : 11}
-                    strokeDasharray={size + ' ' + (100 - size)} strokeDashoffset={-start}
+                    strokeDasharray={size * motion.fraction + ' ' + (100 - size * motion.fraction)} strokeDashoffset={-start}
                     transform="rotate(-90 60 60)" className="journal-transparency__segment" />;
                 })}
               </svg>
